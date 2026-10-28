@@ -4,12 +4,14 @@
     <!-- Location while the app is open (the map's position dot and "Go to my location") -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <!-- Track Recorder: keeps recording with the screen off through a location foreground
-         service with a "Recording track" notification. Started from the app in front, so it
-         needs no background location permission. -->
+    <!-- Track Recorder, GPS Tracking and S.O.S: keep the GPS on with the screen off through a
+         location foreground service with a notification. Started from the app in front, so
+         it needs no background location permission (ACCESS_BACKGROUND_LOCATION). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Android 13+: shows that GPS notification (asked when GPS starts in the background) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:label="@string/app_name"
@@ -39,6 +41,14 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Shared links (?at=, ?place=, ?area=) open in the app; verified with
+                 https://landscape360.jcdigital.co.id/.well-known/assetlinks.json -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="landscape360.jcdigital.co.id" android:path="/"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

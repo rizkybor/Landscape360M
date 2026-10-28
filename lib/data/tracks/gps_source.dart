@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 
 // GPS fixes for the Track Recorder, GPS Tracking and S.O.S, kept coming while the screen is off or another app is in
@@ -107,8 +108,16 @@ class GeolocatorGpsSource implements GpsSource {
     return const geo.LocationSettings(accuracy: geo.LocationAccuracy.best, distanceFilter: _distanceFilter);
   }
 
+  static const _notifications = MethodChannel('l360/notifications');
+
   @override
-  Stream<GpsFix> watch() => geo.Geolocator.getPositionStream(locationSettings: _settings)
+  Stream<GpsFix> watch() {
+    // Android 13+ asks once for notifications, so the GPS notification shows (MainActivity.kt)
+    if (Platform.isAndroid) _notifications.invokeMethod<void>('request').ignore();
+    return _positions();
+  }
+
+  Stream<GpsFix> _positions() => geo.Geolocator.getPositionStream(locationSettings: _settings)
       .map(
         (p) => GpsFix(
           lat: p.latitude,

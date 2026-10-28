@@ -23,6 +23,7 @@ spesifikasi di `docs/flutter-spec.md`.
 | 7e Basemap kustom | Selesai: daftar basemap Enterprise dari web, nyala/mati (tersinkron), opacity, zoom, hapus; gambar disimpan di HP sehingga tampil tanpa sinyal. Unggah tetap di web. Menunggu uji di HP |
 | 7f Ekspor laporan | Selesai: PNG / JPG / PDF seperti web (header, peta + titik bernomor, info peta, tabel titik, profil elevasi, marked locations terlihat, footer halaman), dibagikan lewat lembar berbagi. Menunggu uji di HP |
 | 7g GPS Tracking | Selesai di app: anggota (pengguna360) Pro / Enterprise membagikan posisi live ke monitor lewat kanal privat, tiap 3 dtk, juga saat layar mati; menjawab permintaan monitor; kirim ulang saat sinyal kembali. Monitor360 dan admin memantau di web. Aktif setelah migration + perubahan web di `docs/backend/live-tracking/` diterapkan. Menunggu uji di HP |
+| 8 Kepatuhan store | Selesai di app: hapus akun (dua langkah + password, data akun di HP ikut dihapus, admin tidak bisa), halaman About (versi, privasi, syarat, hapus akun, dukungan), privacy manifest iOS, teks izin (lokasi, simpan ke Foto), notifikasi Android 13, App Links Android dan Associated Domains iOS (build Release). Bagian web siap disalin dari `docs/backend/store/` (endpoint `DELETE /api/account`, halaman `/delete-account`, `.well-known`, revisi Privacy Policy). Tanpa harga, pembelian, atau iklan di app. Menunggu uji di HP |
 | 8–10 | Belum |
 
 ## Menjalankan

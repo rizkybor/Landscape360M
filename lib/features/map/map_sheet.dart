@@ -15,6 +15,7 @@ import '../../domain/map/grid_dms.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/terrain/contours.dart';
+import '../account/sign_in_sheet.dart';
 import '../areas/area_state.dart';
 import '../basemaps/basemap_sheet.dart';
 import '../basemaps/basemap_state.dart';
@@ -470,9 +471,13 @@ class _ToolsSection extends ConsumerWidget {
   // Any signed-in account opens it (own and shared tracks); recording needs Enterprise
   static void _toggleTrack(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Sign in to record and view tracks.')));
+      unawaited(
+        showSignInSheet(
+          context,
+          title: 'Track Recorder',
+          reason: 'Sign in to record your tracks with the screen off and see the ones shared with you.',
+        ),
+      );
       return;
     }
     final rec = ref.read(trackRecorderProvider.notifier);
@@ -489,9 +494,13 @@ class _ToolsSection extends ConsumerWidget {
   // Any signed-in account; the plan sets how many locations and whether they can be shared
   static void _openMarked(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Sign in to save your own locations.')));
+      unawaited(
+        showSignInSheet(
+          context,
+          title: 'Marked Locations',
+          reason: 'Sign in to save your own locations and share them with your team.',
+        ),
+      );
       return;
     }
     unawaited(showMarkedSheet(context, markedHost(ref)));
@@ -499,19 +508,35 @@ class _ToolsSection extends ConsumerWidget {
 
   static void _openBasemaps(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Sign in to use your custom basemaps.')));
+      unawaited(
+        showSignInSheet(
+          context,
+          title: 'Custom Basemaps',
+          reason: 'Sign in to show the maps you uploaded over the base map.',
+        ),
+      );
       return;
     }
     unawaited(showBasemapSheet(context));
   }
 
+  static void _openGps(BuildContext context, WidgetRef ref) {
+    if (ref.read(authUserIdProvider).value == null) {
+      unawaited(
+        showSignInSheet(
+          context,
+          title: 'GPS Tracking',
+          reason: "Sign in to share your live position with your team's monitors.",
+        ),
+      );
+      return;
+    }
+    unawaited(showLiveTrackingSheet(context));
+  }
+
   static void _toggleAreas(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Sign in to draw and save areas.')));
+      unawaited(showSignInSheet(context, title: 'Marked Areas', reason: 'Sign in to draw, save and share areas.'));
       return;
     }
     final areas = ref.read(areasProvider.notifier);
@@ -525,6 +550,8 @@ class _ToolsSection extends ConsumerWidget {
     }
   }
 
+  static const _needsAccount = {'Track', 'Marked', 'Areas', 'Basemaps', 'GPS'};
+
   static const _columns = 4;
   static const _gap = 10.0;
 
@@ -536,6 +563,7 @@ class _ToolsSection extends ConsumerWidget {
       final side = ((constraints.maxWidth - _gap * (_columns - 1)) / _columns).floorToDouble();
       // GPS Tracking is for members; monitor accounts watch on the web
       final member = ref.watch(profileProvider.select((p) => p.value?.isMember ?? true));
+      final signedIn = ref.watch(authUserIdProvider.select((a) => a.value != null));
       return Wrap(
         alignment: WrapAlignment.center,
         spacing: _gap,
@@ -549,6 +577,8 @@ class _ToolsSection extends ConsumerWidget {
                   icon: icon,
                   label: label,
                   availableInPhase: phase,
+                  // Tools that keep data in the account look switched off until signing in
+                  locked: !signedIn && _needsAccount.contains(label),
                   active: switch (label) {
                     'Route' => ref.watch(routePlannerProvider.select((s) => s.enabled)),
                     'Navigator' => ref.watch(navigatorProvider.select((s) => s.enabled)),
@@ -567,7 +597,7 @@ class _ToolsSection extends ConsumerWidget {
                     'Marked' => () => _openMarked(context, ref),
                     'Areas' => () => _toggleAreas(context, ref),
                     'Basemaps' => () => _openBasemaps(context, ref),
-                    'GPS' => () => showLiveTrackingSheet(context),
+                    'GPS' => () => _openGps(context, ref),
                     // A map layer that stays on (remembered); switching it on lowers the sheet
                     'POIs' =>
                       () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
@@ -590,6 +620,7 @@ class ToolTile extends StatelessWidget {
     this.availableInPhase,
     this.onTap,
     this.active = false,
+    this.locked = false,
   });
 
   final IconData icon;
@@ -597,6 +628,7 @@ class ToolTile extends StatelessWidget {
   final int? availableInPhase; // set while the tool is not built yet
   final VoidCallback? onTap;
   final bool active; // the tool is switched on
+  final bool locked; // needs signing in: dimmed like a disabled tile, the tap explains
 
   bool get enabled => availableInPhase == null && onTap != null;
 
@@ -621,7 +653,7 @@ class ToolTile extends StatelessWidget {
         }
       },
       child: Opacity(
-        opacity: enabled ? 1 : 0.55,
+        opacity: enabled && !locked ? 1 : 0.5,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Column(

@@ -189,6 +189,38 @@ class AccountRepository {
     await backend.signOut(others: true);
   }
 
+  /// Deletes the signed-in account and everything in it (DELETE /api/account, required by
+  /// Google Play and the App Store). The password is checked first, so someone holding an
+  /// unlocked phone cannot delete the account. Signs out afterwards; the server refuses the
+  /// admin account.
+  Future<void> deleteAccount({required String password}) async {
+    final user = backend.currentUser;
+    if (user == null || user.email == null) throw const AccountException('Not signed in');
+    if (password.isEmpty) throw const AccountException('Enter your password');
+    try {
+      await backend.signIn(user.email!, password);
+    } on AuthException catch (err) {
+      throw AccountException(
+        RegExp('invalid login credentials', caseSensitive: false).hasMatch(err.message)
+            ? 'Your password is not correct'
+            : err.message,
+      );
+    }
+    try {
+      ApiClient.decode(await api.authed('DELETE', '/api/account'));
+    } on ApiException catch (e) {
+      throw AccountException(e.message);
+    }
+    for (final key in [_sosKey(user.id), _accessKey(user.id)]) {
+      await prefs.remove(key);
+    }
+    try {
+      await backend.signOut();
+    } on Object {
+      // The account is gone on the server; the session on the phone is dropped anyway
+    }
+  }
+
   /// Sends the public account request form
   Future<void> requestAccount(AccountRequestInput input) async {
     final problem = accountRequestError(input);

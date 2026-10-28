@@ -276,3 +276,22 @@ Butuh dulu: migration dan perubahan web di `docs/backend/live-tracking/` sudah d
 | 7g.7 | Monitor membuka Team Monitor saat anggota diam | Posisi anggota muncul segera (jawaban heartbeat) | | |
 | 7g.8 | Stop sharing | Pill hilang; anggota menjadi offline di web setelah 60 dtk | | |
 | 7g.9 | Akun tanpa login di web/anon mencoba dengar `tracking-room` | Ditolak (kanal privat) | | |
+
+## Fase 8 — Kepatuhan store
+
+Butuh dulu: file di `docs/backend/store/` sudah disalin ke web dan ter-deploy.
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 8.1 | User Account → About Landscape 360 | Versi app, link User guide, FAQ, Reviews, Contact support, Privacy, Terms, Deleting your account | | |
+| 8.2 | Quick Start Guide → About, privacy and support | Halaman About terbuka (juga tanpa login) | | |
+| 8.3 | Login admin → User Account | Tidak ada Delete account | | |
+| 8.4 | Akun uji → Delete account → Cancel | Tidak ada yang terhapus | | |
+| 8.5 | Delete account → Continue → password salah + DELETE | "Your password is not correct", akun tetap ada | | |
+| 8.6 | Saat merekam track → Delete account | Pesan "Stop and save the track…", tidak lanjut | | |
+| 8.7 | Password benar + DELETE → Delete my account forever | Kembali ke peta, "Your account has been deleted."; login dengan akun itu gagal; track lokal dan kontak darurat akun itu hilang | | |
+| 8.8 | Buka https://landscape360.jcdigital.co.id/delete-account | Halaman publik menjelaskan cara dan isi yang dihapus | | |
+| 8.9 | Laporan PNG → share sheet → Save Image (iPhone) | Minta izin Foto dengan teks Landscape 360, gambar tersimpan, app tidak crash | | |
+| 8.10 | Android 13+: mulai rekam track | Minta izin notifikasi; notifikasi "Landscape 360 is using GPS" tampil | | |
+| 8.11 | Ketuk link `?at=` di WhatsApp (Android, setelah assetlinks ter-deploy) | Terbuka langsung di app | | |
+

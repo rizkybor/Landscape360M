@@ -73,21 +73,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           children: [
             Center(child: Image.asset('assets/images/logo.png', width: 96, height: 96)),
-            const SizedBox(height: 8),
-            const BrandName(fontSize: 15, textAlign: TextAlign.center),
-            const SizedBox(height: 10),
-            Text('Welcome back', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 4),
-            Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: 'Sign in to '),
-                  ...brandSpans(),
-                  const TextSpan(text: ' to save surveys, tracks and places.'),
-                ],
-              ),
+            const SizedBox(height: 14),
+            // The brand is the title; "Welcome back" sits under it, smaller
+            const BrandName(key: Key('login-brand'), fontSize: 28, textAlign: TextAlign.center),
+            const SizedBox(height: 22),
+            Text(
+              'Welcome back',
+              key: const Key('login-welcome'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: L360Colors.sand600),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Sign in to Landscape 360 app to save surveys, tracks and places.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: L360Colors.sand600),
             ),
             const SizedBox(height: 28),
             AutofillGroup(
@@ -145,9 +145,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 16),
             OutlinedButton(onPressed: () => context.push('/request-account'), child: const Text('Request an account')),
+            const SizedBox(height: 32),
+            const _Credits(),
           ],
         ),
       ),
     );
   }
+}
+
+/// "Powered by" on one small line, like the bottom of the web's sign in
+class _Credits extends StatelessWidget {
+  const _Credits();
+
+  static const _small = TextStyle(fontSize: 10, color: L360Colors.sand400);
+  static const _name = TextStyle(fontSize: 10, color: L360Colors.sand600, fontWeight: FontWeight.w700);
+
+  Widget _link(String text, String url) => GestureDetector(
+    onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+    child: Text(text, style: _name),
+  );
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    key: const Key('login-credits'),
+    alignment: WrapAlignment.center,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 4,
+    runSpacing: 2,
+    children: [
+      const Text('Powered by', style: _small),
+      _link('Jendela Cakra Digital', 'https://instagram.com/jendelacakradigital'),
+      const Text('·', style: _small),
+      _link('Makopala Univ. Budi Luhur', 'https://instagram.com/makopala_ubl'),
+      Text('· @${DateTime.now().year}', style: _small),
+    ],
+  );
 }

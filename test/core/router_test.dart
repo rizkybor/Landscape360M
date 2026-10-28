@@ -56,6 +56,23 @@ void main() {
     expect(find.byKey(const Key('login-submit')), findsOneWidget);
   });
 
+  testWidgets('sign in: the brand is the title, the subtitle is plain text, credits at the bottom', (tester) async {
+    await pump(tester, signedIn: false, start: '/login');
+    final brand = tester.getSize(find.byKey(const Key('login-brand')));
+    final welcome = tester.getSize(find.byKey(const Key('login-welcome')));
+    expect(brand.height, greaterThan(welcome.height));
+    // Room between the two
+    expect(
+      tester.getTopLeft(find.byKey(const Key('login-welcome'))).dy -
+          tester.getBottomLeft(find.byKey(const Key('login-brand'))).dy,
+      greaterThanOrEqualTo(20),
+    );
+    expect(find.text('Sign in to Landscape 360 app to save surveys, tracks and places.'), findsOneWidget);
+    await tester.dragUntilVisible(find.byKey(const Key('login-credits')), find.byType(ListView), const Offset(0, -200));
+    expect(find.text('Jendela Cakra Digital'), findsOneWidget);
+    expect(find.text('Makopala Univ. Budi Luhur'), findsOneWidget);
+  });
+
   testWidgets('signed out: the map opens without signing in', (tester) async {
     await pump(tester, signedIn: false, start: '/');
     expect(find.textContaining('MAPBOX_PUBLIC_TOKEN'), findsOneWidget);

@@ -185,10 +185,30 @@ void main() {
           isTrue,
         );
       }
-      // Every tool of the web's phone layout is in the app; signed out, Basemaps asks to sign in
-      await tester.tap(find.byKey(const Key('tool-Basemaps')));
-      await tester.pump();
-      expect(find.text('Sign in to use your custom basemaps.'), findsOneWidget);
+      // Signed out, the tools that keep data in the account look disabled and all open the
+      // same Sign in sheet; the others stay as they are
+      double opacityOf(String name) => tester
+          .widget<Opacity>(find.descendant(of: find.byKey(Key('tool-$name')), matching: find.byType(Opacity)))
+          .opacity;
+      for (final name in ['Track', 'Marked', 'Areas', 'Basemaps', 'GPS']) {
+        expect(opacityOf(name), 0.5, reason: name);
+      }
+      for (final name in ['Navigator', 'Route', 'POIs']) {
+        expect(opacityOf(name), 1, reason: name);
+      }
+      for (final (name, title) in [
+        ('Basemaps', 'Custom Basemaps'),
+        ('GPS', 'GPS Tracking'),
+        ('Track', 'Track Recorder'),
+      ]) {
+        await tester.tap(find.byKey(Key('tool-$name')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('sign-in-sheet')), findsOneWidget);
+        expect(find.text(title), findsOneWidget);
+        expect(find.byKey(const Key('sign-in-sheet-login')), findsOneWidget);
+        await tester.tapAt(const Offset(200, 40));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.byKey(const Key('guide')));
       await tester.pumpAndSettle();
       expect(find.text('Quick Start Guide'), findsOneWidget);

@@ -13,6 +13,7 @@ import '../offline/offline_ui.dart';
 import '../sos/sos_alerts.dart';
 import '../sos/sos_screen.dart';
 import '../sos/sos_state.dart';
+import 'delete_account.dart';
 
 /// User Account: profile, plan / role badges, cloud storage, edit, password, sign out.
 /// Admins get a link to the admin panel, which stays on the web.
@@ -209,6 +210,18 @@ class _AccountBody extends ConsumerWidget {
           GroupedSection(
             children: [
               ListTile(
+                key: const Key('account-about'),
+                leading: const TileIcon(Icons.info_outline),
+                title: const Text('About Landscape 360'),
+                subtitle: const Text('Version, privacy, terms and support'),
+                trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                onTap: () => context.push('/about'),
+              ),
+            ],
+          ),
+          GroupedSection(
+            children: [
+              ListTile(
                 key: const Key('sign-out'),
                 leading: const TileIcon(Icons.logout, color: L360Colors.brick500, background: L360Colors.brick50),
                 title: const Text(
@@ -219,6 +232,22 @@ class _AccountBody extends ConsumerWidget {
               ),
             ],
           ),
+          if (!p.isAdmin)
+            GroupedSection(
+              footer: 'Deletes the account and everything in it for good.',
+              children: [
+                ListTile(
+                  key: const Key('delete-account'),
+                  leading: const TileIcon(
+                    Icons.person_remove_outlined,
+                    color: L360Colors.brick500,
+                    background: L360Colors.brick50,
+                  ),
+                  title: const Text('Delete account', style: TextStyle(color: L360Colors.brick500)),
+                  onTap: () => confirmDeleteAccount(context, ref),
+                ),
+              ],
+            ),
         ],
       ),
     );

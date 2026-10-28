@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Release (App Store) builds only: shared links open in the app. Needs the paid Apple
+     Developer account; the free personal team used for Profile builds cannot sign it. -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:landscape360.jcdigital.co.id</string>
+	</array>
+</dict>
+</plist>
