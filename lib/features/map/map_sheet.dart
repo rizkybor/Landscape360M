@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,8 @@ import '../../domain/map/map_settings.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/terrain/contours.dart';
 import '../guide/quick_guide.dart';
+import '../marked/marked_sheet.dart';
+import '../marked/marked_state.dart';
 import '../navigator/navigator_state.dart';
 import '../tracks/track_recorder_state.dart';
 import 'map_settings_controller.dart';
@@ -351,9 +355,9 @@ class _ToolsSection extends ConsumerWidget {
   static const tools = [
     (Icons.straighten, 'Navigator', null),
     (Icons.alt_route, 'Route', null),
-    (Icons.place_outlined, 'POIs', 7),
+    (Icons.place_outlined, 'POIs', null),
     (Icons.directions_walk, 'Track', null),
-    (Icons.pin_drop_outlined, 'Marked', 7),
+    (Icons.pin_drop_outlined, 'Marked', null),
     (Icons.hexagon_outlined, 'Areas', 7),
     (Icons.layers_outlined, 'Basemaps', 7),
   ];
@@ -400,6 +404,17 @@ class _ToolsSection extends ConsumerWidget {
     }
   }
 
+  // Any signed-in account; the plan sets how many locations and whether they can be shared
+  static void _openMarked(BuildContext context, WidgetRef ref) {
+    if (ref.read(authUserIdProvider).value == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Sign in to save your own locations.')));
+      return;
+    }
+    unawaited(showMarkedSheet(context, markedHost(ref)));
+  }
+
   static const _columns = 4;
   static const _gap = 10.0;
 
@@ -425,12 +440,18 @@ class _ToolsSection extends ConsumerWidget {
                   'Route' => ref.watch(routePlannerProvider.select((s) => s.enabled)),
                   'Navigator' => ref.watch(navigatorProvider.select((s) => s.enabled)),
                   'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
+                  'POIs' => ref.watch(mapSettingsProvider.select((s) => s.showPois)),
+                  'Marked' => ref.watch(markedProvider.select((s) => s.picking)),
                   _ => false,
                 },
                 onTap: switch (label) {
                   'Route' => () => _toggleRoute(ref),
                   'Navigator' => () => _toggleNavigator(ref),
                   'Track' => () => _toggleTrack(context, ref),
+                  'Marked' => () => _openMarked(context, ref),
+                  // A map layer that stays on (remembered); switching it on lowers the sheet
+                  'POIs' =>
+                    () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
                   _ => null,
                 },
               ),

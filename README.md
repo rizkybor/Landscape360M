@@ -16,7 +16,9 @@ spesifikasi di `docs/flutter-spec.md`.
 | 5 Navigator | Selesai: titik, lengkung Bezier, sudut tajam, Straight + snap sudut, banyak sheet, daftar titik (DD/DMS/UTM/Elev, azimuth, slope), simpan otomatis ke cloud (format sama dengan web) + offline. Menunggu uji di HP |
 | 6 Track Recorder | Selesai: rekam di HP dulu (SQLite) saat layar mati / di background, Online / Offline, pause / resume, pulih setelah app ditutup, sinkron ke `recorded_tracks`, daftar track sendiri + dibagikan, berbagi via email, GPX. Live tracking ditahan (kanal `tracking-room` publik). Menunggu uji di HP |
 | 6b S.O.S | Selesai tanpa push: tombol tahan 3 dtk, hitung mundur, layar darurat (DMS/UTM, 112/115, SMS kontak, share, sirene, senter Morse), laporan ke admin tiap 30 dtk lewat antrean offline yang jalan juga di background, panel admin (banner, penanda peta, resolve, hapus). Push notification menunggu Firebase + Apple Developer berbayar. Menunggu uji di HP |
-| 7–10 | Belum |
+| 7a POIs, Share Location, link | Selesai: layer POI (warna per kategori, cluster, kartu), tombol POIs diingat, Share Location (WhatsApp / aplikasi lain / copy), penanganan link `?at=` dan `?place=` tanpa login. Link dari luar aplikasi menunggu Fase 8 (domain terverifikasi). Menunggu uji di HP |
+| 7b Marked Locations | Selesai: penanda ikon kategori + nama, kartu, daftar Mine/Shared/All, cari, tambah/edit (pilih di peta, pusat peta, GPS), hapus, GPX, berbagi ke akun (Recent + cari) dan sebagai link. Menunggu uji di HP |
+| 7c–10 | Belum |
 
 ## Menjalankan
 

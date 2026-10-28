@@ -56,6 +56,7 @@ class MapSettings {
     this.showGrid = false,
     this.gridOpacity = defaultGridOpacity,
     this.gridStep,
+    this.showPois = true,
   });
 
   /// Reads saved settings; anything missing or invalid falls back to the default.
@@ -75,6 +76,7 @@ class MapSettings {
       showGrid: j['showGrid'] == true,
       gridOpacity: num01(j['gridOpacity'], defaultGridOpacity),
       gridStep: step is num && step > 0 ? step.toDouble() : null,
+      showPois: j['showPois'] is bool ? j['showPois'] as bool : true,
     );
   }
 
@@ -89,6 +91,9 @@ class MapSettings {
   final bool showGrid;
   final double gridOpacity; // 0..1
   final double? gridStep; // degrees; null = automatic by zoom
+
+  /// Points of interest on the map (on by default and remembered, like the web)
+  final bool showPois;
 
   bool get is3D => view == MapView.threeD;
 
@@ -107,6 +112,7 @@ class MapSettings {
     bool? showGrid,
     double? gridOpacity,
     double? Function()? gridStep,
+    bool? showPois,
   }) => MapSettings(
     style: style ?? this.style,
     view: view ?? this.view,
@@ -118,6 +124,7 @@ class MapSettings {
     showGrid: showGrid ?? this.showGrid,
     gridOpacity: gridOpacity ?? this.gridOpacity,
     gridStep: gridStep == null ? this.gridStep : gridStep(),
+    showPois: showPois ?? this.showPois,
   );
 
   Map<String, dynamic> toJson() => {
@@ -130,6 +137,7 @@ class MapSettings {
     'showGrid': showGrid,
     'gridOpacity': gridOpacity,
     'gridStep': gridStep,
+    'showPois': showPois,
   };
 }
 

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers.dart';
 import '../../data/map/map_services.dart';
+import '../../domain/map/map_settings.dart';
 import '../../domain/route/route_planner.dart';
 import '../../domain/search/place_search.dart';
 import '../../domain/weather/villages.dart';
@@ -61,6 +62,16 @@ class WeatherShown extends Notifier<bool> {
 }
 
 final weatherShownProvider = NotifierProvider<WeatherShown, bool>(WeatherShown.new);
+
+/// Centre of the map (the crosshair), for tools that use it (e.g. "Map center" in a form)
+class MapCenter extends Notifier<({double lng, double lat})> {
+  @override
+  ({double lng, double lat}) build() => (lng: defaultCenter.lng, lat: defaultCenter.lat);
+
+  void set(double lng, double lat) => state = (lng: lng, lat: lat);
+}
+
+final mapCenterProvider = NotifierProvider<MapCenter, ({double lng, double lat})>(MapCenter.new);
 
 typedef FlyTarget = ({double lng, double lat, double zoom});
 

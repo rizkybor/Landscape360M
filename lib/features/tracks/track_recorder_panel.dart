@@ -1329,6 +1329,8 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
             const SizedBox(width: 8),
             FilledButton(
               key: const Key('share-send'),
+              // Beside the field: not the theme's full width
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
               onPressed: _sharing ? null : _share,
               child: _sharing
                   ? const SizedBox.square(

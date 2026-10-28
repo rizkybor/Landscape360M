@@ -19,6 +19,10 @@ import '../../domain/map/map_settings.dart';
 import '../../domain/route/route_planner.dart';
 import '../../domain/survey/survey_model.dart';
 import '../../domain/tracks/track_recorder_geo.dart';
+import '../../domain/util/js_compat.dart';
+import '../marked/marked_layer.dart';
+import '../marked/marked_sheet.dart';
+import '../marked/marked_state.dart';
 import '../navigator/navigator_overlay.dart';
 import '../navigator/navigator_panel.dart';
 import '../navigator/navigator_state.dart';
@@ -32,8 +36,11 @@ import 'location_puck.dart';
 import 'map_settings_controller.dart';
 import 'map_sheet.dart';
 import 'map_tools_state.dart';
+import 'poi_layer.dart';
 import 'route_layer.dart';
 import 'route_panel.dart';
+import 'share_location_sheet.dart';
+import 'shared_links.dart';
 import 'telemetry_card.dart';
 import 'terrain_layers.dart';
 import 'weather_card.dart';
@@ -174,12 +181,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref
       ..listen(routePlannerProvider.select((s) => s.enabled), lowerSheet)
       ..listen(navigatorProvider.select((s) => s.enabled), lowerSheet)
-      ..listen(trackRecorderProvider.select((s) => s.panelOpen), lowerSheet);
+      ..listen(trackRecorderProvider.select((s) => s.panelOpen), lowerSheet)
+      ..listen(mapSettingsProvider.select((s) => s.showPois), lowerSheet);
     final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
     final recordingHidden = !trackOpen && ref.watch(trackRecorderProvider.select((s) => s.active != null));
     final sosAlerts = ref.watch(sosAlertsProvider.select((s) => s.active.isNotEmpty));
+    final sharedLink = ref.watch(sharedLinkProvider) != null;
+    final poiOpen = ref.watch(selectedPoiProvider) != null;
+    final picking = ref.watch(markedProvider.select((s) => s.picking));
+    final markedOpen = ref.watch(markedProvider.select((s) => s.selectedId != null));
+    // A position picked on the map goes back into the form that asked for it
+    ref.listen<PickedPoint?>(markedProvider.select((s) => s.picked), (_, p) {
+      final draft = ref.read(markedDraftProvider);
+      if (p == null || draft == null) return;
+      unawaited(
+        openMarkedForm(
+          context,
+          markedHost(ref),
+          MarkedDraft(
+            editingId: draft.editingId,
+            name: draft.name,
+            category: draft.category,
+            lat: roundCoord(p.lat),
+            lng: roundCoord(p.lng),
+            elevation: p.elevationM == null ? draft.elevation : jsNum((p.elevationM! * 10).round() / 10),
+            address: draft.address,
+            contact: draft.contact,
+            description: draft.description,
+            tags: draft.tags,
+          ),
+        ),
+      );
+    });
     // Sends S.O.S reports left on the phone as soon as the app opens or the signal returns
     ref.listen(sosProvider, (_, _) {});
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -218,6 +253,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (sosAlerts) ...[const SosBanner(), const SizedBox(height: 10)],
+                    if (sharedLink) ...[const SharedLinkCard(), const SizedBox(height: 10)],
+                    if (poiOpen) ...[const PoiCard(), const SizedBox(height: 10)],
+                    if (picking) ...[const PickingBar(), const SizedBox(height: 10)],
+                    if (markedOpen && !picking) ...[
+                      MarkedCard(
+                        onOpenList: () =>
+                            showMarkedSheet(context, markedHost(ref), focusId: ref.read(markedProvider).selectedId),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
                     if (routeOpen) const RoutePanel(),
                     if (navigatorOpen)
@@ -248,6 +293,10 @@ class _NoMapToken extends StatelessWidget {
   );
 }
 
+/// The live map, for integration tests that check what the map engine drew
+@visibleForTesting
+MapboxMap? debugLiveMap;
+
 class _LiveMap extends ConsumerStatefulWidget {
   const _LiveMap({required this.sheetInset});
 
@@ -271,11 +320,21 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   RouteLayer? _route;
   TrackLayer? _tracks;
   SosAlertsLayer? _sosLayer;
+  PoiLayer? _poiLayer;
+  MarkedLayer? _markedLayer;
+  SharedLinkLayer? _linkLayer;
+  late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
   final _cameraTick = ValueNotifier<int>(0);
   final _styleTick = ValueNotifier<int>(0);
 
   /// Terrain height without the 3D exaggeration (0 where the terrain has not loaded)
+  /// Terrain height where the map has it loaded, else null
+  Future<double?> _terrainAt(double lng, double lat) async {
+    final v = await _map?.getElevation(Point(coordinates: Position(lng, lat)));
+    return v == null ? null : realElevation(v, ref.read(mapSettingsProvider).appliedExaggeration);
+  }
+
   Future<double> _elevationAt(double lng, double lat) async {
     try {
       final v = await _map?.getElevation(Point(coordinates: Position(lng, lat)));
@@ -297,6 +356,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   @override
   void initState() {
     super.initState();
+    _links.start();
     unawaited(
       _prefs.getBool(compassHintDismissedKey).then((v) => _hintUsed = v ?? false, onError: (_) => _hintUsed = false),
     );
@@ -313,6 +373,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   @override
   void dispose() {
     _compassSub?.cancel();
+    _links.dispose();
     _hintTimer?.cancel();
     _layers?.dispose();
     _settle?.cancel();
@@ -364,8 +425,37 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     }
   }
 
+  /// A tap for the open drawing tool; false when none is open
+  bool _toolTap(double lng, double lat) {
+    // Picking a position for the Marked Locations form: this tap sets it (with the terrain height)
+    if (ref.read(markedProvider).picking) {
+      HapticFeedback.lightImpact();
+      unawaited(
+        _terrainAt(lng, lat).then(
+          (h) => ref.read(markedProvider.notifier).setPicked((lng: lng, lat: lat, elevationM: h)),
+          onError: (Object _) => ref.read(markedProvider.notifier).setPicked((lng: lng, lat: lat, elevationM: null)),
+        ),
+      );
+      return true;
+    }
+    if (ref.read(navigatorProvider).enabled) {
+      HapticFeedback.lightImpact();
+      // Like the web, a tap always adds a point (and drops the point selection)
+      final nav = ref.read(navigatorProvider.notifier)..select(null);
+      unawaited(nav.addPointAt(lng, lat, _elevationAt));
+      return true;
+    }
+    if (ref.read(routePlannerProvider).enabled) {
+      HapticFeedback.lightImpact();
+      unawaited(ref.read(routePlannerProvider.notifier).tap((lng: lng, lat: lat)));
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _onMapCreated(MapboxMap map) async {
     setState(() => _map = map); // the survey overlay needs the map
+    debugLiveMap = map;
     final s = ref.read(mapSettingsProvider);
     await map.setCamera(
       CameraOptions(
@@ -376,22 +466,51 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       ),
     );
     await map.setBounds(CameraBoundsOptions(minZoom: minZoom, maxZoom: maxZoom, maxPitch: maxPitch));
-    // Taps on the map add survey points (Navigator) or route points (Route Planner)
+    // Taps on the map add survey points (Navigator) or route points (Route Planner);
+    // otherwise they close an open point-of-interest card
     map.addInteraction(
       TapInteraction.onMap((context) {
         final c = context.point.coordinates;
-        final lng = c.lng.toDouble(), lat = c.lat.toDouble();
-        if (ref.read(navigatorProvider).enabled) {
-          HapticFeedback.lightImpact();
-          // Like the web, a tap always adds a point (and drops the point selection)
-          final nav = ref.read(navigatorProvider.notifier)..select(null);
-          unawaited(nav.addPointAt(lng, lat, _elevationAt));
-        } else if (ref.read(routePlannerProvider).enabled) {
-          HapticFeedback.lightImpact();
-          unawaited(ref.read(routePlannerProvider.notifier).tap((lng: lng, lat: lat)));
-        }
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        ref.read(selectedPoiProvider.notifier).select(null);
+        ref.read(markedProvider.notifier).select(null);
       }, stopPropagation: false),
       interactionID: 'map-tap',
+    );
+    // A point of interest opens its card; a cluster zooms in. With a drawing tool open the
+    // tap still adds a point there.
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: poiPointsLayer), (feature, context) {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        final id = '${feature.properties['id']}';
+        final poi = (ref.read(poisProvider).value ?? const []).where((p) => p.id == id).firstOrNull;
+        if (poi == null) return;
+        HapticFeedback.selectionClick();
+        ref.read(selectedPoiProvider.notifier).select(poi);
+      }),
+      interactionID: 'poi-tap',
+    );
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: markedPointsLayer), (feature, context) {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        HapticFeedback.selectionClick();
+        ref.read(markedProvider.notifier).toggle('${feature.properties['id']}');
+      }),
+      interactionID: 'marked-tap',
+    );
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: poiClustersLayer), (feature, context) async {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        final zoom = (await map.getCameraState()).zoom;
+        await map.easeTo(
+          CameraOptions(center: context.point, zoom: math.min(zoom + 2, maxZoom)),
+          MapAnimationOptions(duration: 500),
+        );
+      }),
+      interactionID: 'poi-cluster-tap',
     );
     // Our own controls replace the built-in compass and scale bar
     await map.compass.updateSettings(CompassSettings(enabled: false));
@@ -406,6 +525,8 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   Future<void> _onStyleLoaded(StyleLoadedEventData _) async {
     final map = _map;
     if (map == null) return;
+    // Marker images are drawn at the screen's density
+    final scale = MediaQuery.devicePixelRatioOf(context);
     try {
       if (!await map.styleSourceExists(terrainSourceId)) {
         await map.addStyleSource(
@@ -419,6 +540,14 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       await route.show(ref.read(routePlannerProvider));
       final layers = _layers ??= TerrainLayers(map);
       await layers.install(ref.read(mapSettingsProvider));
+      final pois = _poiLayer ??= PoiLayer(map);
+      await pois.install(ref.read(poisProvider).value ?? const [], visible: ref.read(mapSettingsProvider).showPois);
+      final marked = _markedLayer ??= MarkedLayer(map, scale);
+      await marked.install();
+      await marked.show(ref.read(markedProvider));
+      final link = _linkLayer ??= SharedLinkLayer(map);
+      await link.install();
+      await link.show(ref.read(sharedLinkProvider));
       final sos = _sosLayer ??= SosAlertsLayer(map);
       await sos.install();
       await sos.show(ref.read(sosAlertsProvider).active);
@@ -514,6 +643,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     final east = await at(lng + slopeSampleOffsetDeg, lat);
     final north = await at(lng, lat + slopeSampleOffsetDeg);
     if (!mounted) return;
+    ref.read(mapCenterProvider.notifier).set(lng, lat);
     setState(() {
       _telemetry = Telemetry(
         lng: lng,
@@ -591,7 +721,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
               timeLimit: Duration(seconds: 6),
             ),
           );
-      // Only if the user has not moved the map away from the start yet
+      // Only if the user has not moved the map away from the start yet, and not when the
+      // app was opened from a share link (the map shows the link's place)
+      if (ref.read(sharedLinkProvider.notifier).openedFromLink) return;
       final c = (await _map?.getCameraState())?.center.coordinates;
       if (c == null || (c.lng - defaultCenter.lng).abs() > 1e-4 || (c.lat - defaultCenter.lat).abs() > 1e-4) return;
       await _map?.setCamera(CameraOptions(center: Point(coordinates: Position(p.longitude, p.latitude))));
@@ -695,6 +827,12 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (next.recording && !(prev?.recording ?? false) && !_puckOn) unawaited(_enablePuck());
     });
     ref.listen<SosAlertsState>(sosAlertsProvider, (_, next) => unawaited(_sosLayer?.show(next.active)));
+    ref.listen(poisProvider, (_, next) {
+      final list = next.value;
+      if (list != null) unawaited(_poiLayer?.show(list));
+    });
+    ref.listen<SharedView?>(sharedLinkProvider, (_, next) => unawaited(_linkLayer?.show(next)));
+    ref.listen<MarkedState>(markedProvider, (_, next) => unawaited(_markedLayer?.show(next)));
     ref.listen<SurveyDoc?>(showSurveyProvider, (_, doc) {
       final b = doc?.bounds;
       if (b == null || _map == null) return;
@@ -730,6 +868,10 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (prev.style != next.style) unawaited(map.loadStyleURI(next.style.uri));
       if (prev.view != next.view) unawaited(_applyView(next));
       if (prev.exaggeration != next.exaggeration && next.is3D) unawaited(_applyTerrain(next));
+      if (prev.showPois != next.showPois) {
+        unawaited(_poiLayer?.setVisible(next.showPois));
+        if (!next.showPois) ref.read(selectedPoiProvider.notifier).select(null);
+      }
       final layers = _layers;
       if (layers != null &&
           (prev.showContours != next.showContours ||
@@ -832,6 +974,13 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
                 child: _locating
                     ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.near_me, color: L360Colors.forest700),
+              ),
+              const SizedBox(height: 10),
+              MapIconButton(
+                key: const Key('share-location'),
+                tooltip: 'Share Location',
+                onPressed: () => showShareLocationSheet(context, terrainAt: _terrainAt),
+                child: const Icon(Icons.share_location, color: L360Colors.forest700),
               ),
               const SizedBox(height: 14),
               const SosButton(),

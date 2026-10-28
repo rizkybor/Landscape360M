@@ -162,3 +162,39 @@ Akun uji: satu akun biasa dengan **S.O.S diizinkan** oleh admin (User Account di
 | 6b.16 | I'm safe (dalam mode pesawat), lalu online lagi | Layar tertutup; setelah online, admin melihat S.O.S berstatus RESOLVED | | |
 | 6b.17 | Admin: Show on map / Call / WhatsApp / Mark resolved + catatan / Delete di History | Sesuai nama; banner hilang setelah resolved | | |
 | 6b.18 | Admin: halaman akun → Open S.O.S screen | Layar S.O.S yang sama terbuka (admin tidak punya tombol di peta) | | |
+
+## Fase 7a — POIs, Share Location, link masuk
+
+Link masuk (`?at=`, `?place=`) baru bisa dibuka langsung dari WhatsApp setelah domain diverifikasi di Fase 8 (universal links / App Links; iPhone butuh akun Apple Developer berbayar). Logikanya sudah diuji di simulator.
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7a.1 | Zoom ke Gunung Gede (zoom ≥ 10) | Titik POI berwarna per kategori (hijau puncak, biru mata air, …); dari jauh tergabung jadi lingkaran oranye bernomor | | |
+| 7a.2 | Ketuk lingkaran bernomor | Peta zoom masuk | | |
+| 7a.3 | Ketuk satu titik | Kartu: nama, kategori, ketinggian, koordinat, deskripsi (Wikipedia) | | |
+| 7a.4 | Ketuk area kosong peta / X | Kartu tertutup | | |
+| 7a.5 | Tools → POIs | Titik hilang, tile tidak "Active"; ketuk lagi: titik kembali, sheet turun. Pilihan tetap setelah app ditutup | | |
+| 7a.6 | Navigator aktif, ketuk sebuah titik POI | Titik survei ditambahkan di sana (kartu POI tidak terbuka) | | |
+| 7a.7 | Tombol Share Location (ikon pin berbagi, kanan) | "Getting your location…", lalu DMS, mdpl, ±m | | |
+| 7a.8 | Send to WhatsApp | WhatsApp terbuka dengan pesan lokasi (link Google Maps + Landscape 360) | | |
+| 7a.9 | Other apps / Copy | Lembar berbagi / "Copied" | | |
+
+## Fase 7b — Marked Locations
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7b.1 | Belum login → Tools → Marked | "Sign in to save your own locations." | | |
+| 7b.2 | Login → Tools → Marked | Sheet "Marked Locations": Mine / Shared (/ All untuk admin), jumlah "n / batas plan" | | |
+| 7b.3 | Add → isi nama, pilih kategori → Pick on map → ketuk peta | Form tertutup, bar "Tap the map…"; setelah ketuk, form terbuka lagi dengan lat/lng/elevasi terisi dan nama tetap | | |
+| 7b.4 | Save Location | Penanda bulat warna kategori dengan ikon, nama di atasnya (zoom ≥ 11); peta ke lokasi; juga muncul di web | | |
+| 7b.5 | Ketuk penanda | Kartu: nama, kategori, mdpl; ˄ detail (DMS, alamat, catatan, tag); Directions, Copy, In list. Ketuk lagi / X: tertutup | | |
+| 7b.6 | Map center / My GPS di form | Koordinat terisi dari tengah peta / GPS | | |
+| 7b.7 | ⋯ → Edit / Delete | Berubah / terhapus (juga di web) | | |
+| 7b.8 | Cari "pos" / tag | Daftar tersaring | | |
+| 7b.9 | Centang beberapa → GPX | File .gpx bisa dibuka aplikasi lain | | |
+| 7b.10 | Akun Pro/Enterprise: ⋯ → Share → pilih "Recent" atau ketik nama/email | "Shared location with …"; penerima melihatnya di tab Shared (penanda bercincin emas) | | |
+| 7b.11 | Share → Create link → Send to WhatsApp / Copy | Pesan berisi link `?place=`; di browser link membuka lokasi tanpa login | | |
+| 7b.12 | Turn off link | Link lama tidak bisa dibuka lagi ("no longer available") | | |
+| 7b.13 | Akun Free: Share tidak ada; di batas 10 lokasi tombol Add mati | Pesan batas plan dan "Hubungi Admin" | | |
+| 7b.14 | Admin: tab All + "Show every account's locations" | Penanda akun lain bercincin abu-abu | | |
+| 7b.15 | Track Recorder → My Tracks → Share (regresi) | Kolom email + tombol Share tampil normal (sebelumnya bisa crash) | | |
