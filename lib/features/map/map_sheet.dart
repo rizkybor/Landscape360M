@@ -19,6 +19,8 @@ import '../areas/area_state.dart';
 import '../basemaps/basemap_sheet.dart';
 import '../basemaps/basemap_state.dart';
 import '../guide/quick_guide.dart';
+import '../live/live_tracking_sheet.dart';
+import '../live/live_tracking_state.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
 import '../navigator/navigator_state.dart';
@@ -436,6 +438,7 @@ class _ToolsSection extends ConsumerWidget {
     (Icons.pin_drop_outlined, 'Marked', null),
     (Icons.hexagon_outlined, 'Areas', null),
     (Icons.layers_outlined, 'Basemaps', null),
+    (Icons.navigation_outlined, 'GPS', null),
   ];
 
   // One panel at a time: opening Route, Navigator or Track closes the others (a recording
@@ -531,42 +534,47 @@ class _ToolsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => LayoutBuilder(
     builder: (context, constraints) {
       final side = ((constraints.maxWidth - _gap * (_columns - 1)) / _columns).floorToDouble();
+      // GPS Tracking is for members; monitor accounts watch on the web
+      final member = ref.watch(profileProvider.select((p) => p.value?.isMember ?? true));
       return Wrap(
         alignment: WrapAlignment.center,
         spacing: _gap,
         runSpacing: _gap,
         children: [
           for (final (icon, label, phase) in tools)
-            SizedBox.square(
-              dimension: side,
-              child: ToolTile(
-                icon: icon,
-                label: label,
-                availableInPhase: phase,
-                active: switch (label) {
-                  'Route' => ref.watch(routePlannerProvider.select((s) => s.enabled)),
-                  'Navigator' => ref.watch(navigatorProvider.select((s) => s.enabled)),
-                  'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
-                  'POIs' => ref.watch(mapSettingsProvider.select((s) => s.showPois)),
-                  'Marked' => ref.watch(markedProvider.select((s) => s.picking)),
-                  'Basemaps' => ref.watch(basemapsProvider.select((s) => s.basemaps.any((b) => b.active))),
-                  'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
-                  _ => false,
-                },
-                onTap: switch (label) {
-                  'Route' => () => _toggleRoute(ref),
-                  'Navigator' => () => _toggleNavigator(ref),
-                  'Track' => () => _toggleTrack(context, ref),
-                  'Marked' => () => _openMarked(context, ref),
-                  'Areas' => () => _toggleAreas(context, ref),
-                  'Basemaps' => () => _openBasemaps(context, ref),
-                  // A map layer that stays on (remembered); switching it on lowers the sheet
-                  'POIs' =>
-                    () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
-                  _ => null,
-                },
+            if (label != 'GPS' || member)
+              SizedBox.square(
+                dimension: side,
+                child: ToolTile(
+                  icon: icon,
+                  label: label,
+                  availableInPhase: phase,
+                  active: switch (label) {
+                    'Route' => ref.watch(routePlannerProvider.select((s) => s.enabled)),
+                    'Navigator' => ref.watch(navigatorProvider.select((s) => s.enabled)),
+                    'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
+                    'POIs' => ref.watch(mapSettingsProvider.select((s) => s.showPois)),
+                    'Marked' => ref.watch(markedProvider.select((s) => s.picking)),
+                    'Basemaps' => ref.watch(basemapsProvider.select((s) => s.basemaps.any((b) => b.active))),
+                    'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
+                    'GPS' => ref.watch(liveTrackingProvider.select((s) => s.on)),
+                    _ => false,
+                  },
+                  onTap: switch (label) {
+                    'Route' => () => _toggleRoute(ref),
+                    'Navigator' => () => _toggleNavigator(ref),
+                    'Track' => () => _toggleTrack(context, ref),
+                    'Marked' => () => _openMarked(context, ref),
+                    'Areas' => () => _toggleAreas(context, ref),
+                    'Basemaps' => () => _openBasemaps(context, ref),
+                    'GPS' => () => showLiveTrackingSheet(context),
+                    // A map layer that stays on (remembered); switching it on lowers the sheet
+                    'POIs' =>
+                      () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
+                    _ => null,
+                  },
+                ),
               ),
-            ),
         ],
       );
     },

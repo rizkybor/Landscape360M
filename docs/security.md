@@ -30,8 +30,12 @@ Diverifikasi ulang terhadap kode web:
 1. **Live tracking bocor (tinggi).** `src/services/TrackerService.ts:615` memakai kanal
    Realtime `tracking-room` tanpa `private: true`, dan tidak ada policy `realtime.messages`.
    Siapa pun yang punya anon key (yang memang publik) bisa mendengar posisi semua pengguna
-   yang broadcast, atau mengirim posisi palsu. **Aplikasi v1 tidak memakai live tracking
-   sampai ini diperbaiki** (kanal privat + policy RLS di `realtime.messages`).
+   yang broadcast, atau mengirim posisi palsu. **Perbaikan siap di
+   `docs/backend/live-tracking/`**: kanal privat, policy `realtime.messages` (hanya monitor
+   yang mendengar posisi; hanya pengguna360 Pro / Enterprise yang mengirim, lewat REST tanpa
+   ikut mendengar), dan perubahan `TrackerService.ts` untuk monitor web. App hanya memakai
+   kanal privat, jadi GPS Tracking di app baru jalan setelah ini diterapkan. Sisa risiko:
+   isi `user_id` di paket tidak dicek server, jadi anggota yang berhak bisa memakai nama lain.
 2. **Password default di repo.** `monitoring@landscape360.app` / `password123`, akun seed,
    dan `demo@landscape360.app` ada di beberapa migration dan `create_demo_user.ts`. Ganti
    password akun-akun ini di production (atau hapus akunnya), dan jangan pakai ulang untuk

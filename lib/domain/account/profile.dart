@@ -81,8 +81,12 @@ class AccountProfile {
   /// Live tracking monitor: Enterprise monitor360 or admin (is_monitor() on the server)
   bool get canMonitor => isAdmin || (plan == Plan.enterprise && role == UserRole.monitor360);
 
-  /// GPS Tracking broadcast: Pro and Enterprise
-  bool get canBroadcast => isAdmin || plan == Plan.pro || plan == Plan.enterprise;
+  /// A member account (pengguna360, not admin): GPS Tracking is theirs; monitors watch on the web
+  bool get isMember => !isAdmin && role == UserRole.pengguna360;
+
+  /// GPS Tracking (sharing your live position with the monitors): members on Pro or
+  /// Enterprise (can_broadcast_location() on the server)
+  bool get canBroadcast => isMember && plan != Plan.free;
 
   /// Cloud storage limit in bytes (null = unlimited): Free 10 MB, Pro 100 MB, Enterprise 1 GB
   int? get storageLimitBytes => isAdmin

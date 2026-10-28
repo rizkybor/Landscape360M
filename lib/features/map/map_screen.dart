@@ -24,6 +24,8 @@ import '../areas/area_layer.dart';
 import '../areas/area_panel.dart';
 import '../areas/area_state.dart';
 import '../basemaps/basemap_state.dart';
+import '../live/live_tracking_sheet.dart';
+import '../live/live_tracking_state.dart';
 import '../marked/marked_layer.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
@@ -238,6 +240,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
     final recordingHidden = !trackOpen && ref.watch(trackRecorderProvider.select((s) => s.active != null));
+    final liveOn = ref.watch(liveTrackingProvider.select((s) => s.on));
     final sosAlerts = ref.watch(sosAlertsProvider.select((s) => s.active.isNotEmpty));
     final sharedLink = ref.watch(sharedLinkProvider) != null;
     final poiOpen = ref.watch(selectedPoiProvider) != null;
@@ -332,6 +335,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       const SizedBox(height: 10),
                     ],
                     if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
+                    if (liveOn) ...[const LivePill(), const SizedBox(height: 10)],
                     if (routeOpen) const RoutePanel(),
                     if (navigatorOpen)
                       NavigatorPanel(onShowSurvey: (doc) => ref.read(showSurveyProvider.notifier).show(doc)),

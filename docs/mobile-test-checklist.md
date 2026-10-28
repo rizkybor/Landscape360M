@@ -115,8 +115,6 @@ Status 28 Oktober 2026: Fase 1 dan Fase 3 lulus di iPhone 13 (iOS 26.7) dengan a
 
 ## Fase 6 — Track Recorder
 
-Live tracking (GPS Tracking ke monitor) belum ada di aplikasi sampai kanal `tracking-room` di backend dibuat privat (lihat `docs/security.md`).
-
 | # | Langkah | Hasil yang diharapkan | Android | iPhone |
 |---|---|---|---|---|
 | 6.1 | Belum login → Tools → Track | Pesan "Sign in to record and view tracks." | | |
@@ -262,3 +260,19 @@ Unggah basemap (GeoTIFF / PDF) tetap lewat web; aplikasi menampilkannya.
 | 7f.5 | Save as JPG | Satu JPG per halaman, bisa disimpan ke Photos | | |
 | 7f.6 | Tanpa titik survei | Laporan tetap dibuat: peta + "No Survey Data Available" | | |
 | 7f.7 | Ukuran file | PDF 2 halaman kira-kira < 2 MB | | |
+
+## Fase 7g — GPS Tracking (dilacak monitor)
+
+Butuh dulu: migration dan perubahan web di `docs/backend/live-tracking/` sudah diterapkan.
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7g.1 | Login akun monitor360 Enterprise → Tools | Tidak ada tile GPS (monitor memantau di web) | | |
+| 7g.2 | Login pengguna360 Free → Tools → GPS | Pesan "available for Pro and Enterprise", tanpa tombol Start | | |
+| 7g.3 | Login pengguna360 Pro / Enterprise → Tools → GPS → Start sharing | Status "Sharing · sent just now", pill LIVE di peta | | |
+| 7g.4 | Buka Team Monitor di web (monitor360 Enterprise) | Anggota muncul dengan nama email sebelum @ (kapital) dan baterai asli, bergerak tiap beberapa detik | | |
+| 7g.5 | Kunci layar HP 5 menit sambil jalan | Posisi di web terus bergerak; iPhone menampilkan indikator lokasi biru | | |
+| 7g.6 | Mode pesawat 1 menit, lalu matikan | Pill "waiting for signal", lalu posisi langsung terkirim lagi | | |
+| 7g.7 | Monitor membuka Team Monitor saat anggota diam | Posisi anggota muncul segera (jawaban heartbeat) | | |
+| 7g.8 | Stop sharing | Pill hilang; anggota menjadi offline di web setelah 60 dtk | | |
+| 7g.9 | Akun tanpa login di web/anon mencoba dengar `tracking-room` | Ditolak (kanal privat) | | |
