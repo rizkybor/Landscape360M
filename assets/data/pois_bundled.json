@@ -1,0 +1,410 @@
+[
+  {
+    "id": "1",
+    "type": "Feature",
+    "place_type": ["poi", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Sekretariat Makopala - Univ. Budi Luhur",
+    "place_name": "Sekretariat Makopala",
+    "center": [106.74698, -6.23375],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.74698, -6.23375]
+    }
+  },
+  {
+    "id": "2",
+    "type": "Feature",
+    "place_type": ["basecamp", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Basecamp Pendakian via Putri",
+    "place_name": "BC Gunung Gede Pangrango (TNGGP) via Putri",
+    "center": [107.01037, -6.75567],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.01037, -6.75567]
+    }
+  },
+  {
+    "id": "3",
+    "type": "Feature",
+    "place_type": ["basecamp", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Basecamp Pendakian via Cibodas",
+    "place_name": "BC Gunung Gede Pangrango (TNGGP) via Cibodas",
+    "center": [107.00683, -6.73614],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.00683, -6.73614]
+    }
+  },
+  {
+    "id": "4",
+    "type": "Feature",
+    "place_type": ["basecamp", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Basecamp Pendakian via Salabintana",
+    "place_name": "BC Gunung Gede Pangrango (TNGGP) via Salabintana",
+    "center": [106.96136, -6.84869],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.96136, -6.84869]
+    }
+  },
+  {
+    "id": "5",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": "Gerbang utama menuju gunung ini adalah dari jalur Cibodas dan Cipanas (Gunung Putri) di utara serta jalur Salabintana di arah selatan yang tidak begitu banyak dilalui pendaki. Untuk mencapai lokasi pintu masuk Taman Nasional Gede Pangrango bisa ditempuh melalui rute Jakarta-Bogor-Cibodas dengan waktu sekitar 2,5 jam (± 80 km) menggunakan mobil, atau Bandung-Cipanas-Cibodas dengan waktu 2 jam (± 89 km), dan Bogor-Sukabumi-Salabintana dengan waktu 2 jam (62 km)."
+    },
+    "text": "2.958 - 2.962 mdpl",
+    "place_name": "Gunung Gede (TNGGP)",
+    "center": [106.9832, -6.78991],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.9832, -6.78991]
+    }
+  },
+  {
+    "id": "6",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "3.019 mdpl",
+    "place_name": "Gunung Pangrango (TNGGP)",
+    "center": [106.96435, -6.77044],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.96435, -6.77044]
+    }
+  },
+  {
+    "id": "7",
+    "type": "Water",
+    "place_type": ["water", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Permanent",
+    "place_name": "Mata Air Pos Kandang Badak",
+    "center": [106.97463, -6.7771],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.97463, -6.7771]
+    }
+  },
+  {
+    "id": "8",
+    "type": "Water",
+    "place_type": ["water", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Permanent",
+    "place_name": "Mata Air Surya Kencana",
+    "center": [106.98426, -6.79641],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.98426, -6.79641]
+    }
+  },
+  {
+    "id": "9",
+    "type": "Water",
+    "place_type": ["water", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Seasonal",
+    "place_name": "Mata Air Alun-Alun Mandalawangi",
+    "center": [106.96389, -6.76939],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.96389, -6.76939]
+    }
+  },
+  {
+    "id": "10",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "1.916 mdpl",
+    "place_name": "Gunung Sumbul (TNGHS)",
+    "center": [106.72202, -6.70923],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.72202, -6.70923]
+    }
+  },
+  {
+    "id": "11",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "2.211 mdpl",
+    "place_name": "Gunung Salak 2 (TNGHS)",
+    "center": [106.72826, -6.70161],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.72826, -6.70161]
+    }
+  },
+  {
+    "id": "12",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "2.180 mdpl",
+    "place_name": "Gunung Salak 1 (TNGHS)",
+    "center": [106.73339, -6.71596],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.73339, -6.71596]
+    }
+  },
+  {
+    "id": "13",
+    "type": "Feature",
+    "place_type": ["water", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Permanent",
+    "place_name": "Sungai",
+    "center": [106.71259, -6.72038],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.71259, -6.72038]
+    }
+  },
+  {
+    "id": "14",
+    "type": "Feature",
+    "place_type": ["water", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Seasonal",
+    "place_name": "Sungai",
+    "center": [106.70751, -6.72923],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.70751, -6.72923]
+    }
+  },
+  {
+    "id": "15",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "875 mdpl",
+    "place_name": "Gunung Batu Jonggol",
+    "center": [107.05315, -6.6035],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.05315, -6.6035]
+    }
+  },
+  {
+    "id": "16",
+    "type": "Feature",
+    "place_type": ["basecamp", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Basecamp Pendakian via Sukamakmur",
+    "place_name": "BC Gunung Batu Jonggol via Sukamakmur",
+    "center": [107.04903, -6.60372],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.04903, -6.60372]
+    }
+  },
+  {
+    "id": "17",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "1.291 mdpl",
+    "place_name": "Gunung Sanggabuana",
+    "center": [107.22063, -6.59049],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.22063, -6.59049]
+    }
+  },
+  {
+    "id": "18",
+    "type": "Feature",
+    "place_type": ["basecamp", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Pos Tiket Pendakian via Mekarbuana",
+    "place_name": "BC Gunung Sanggabuana via Mekarbuana",
+    "center": [107.22704, -6.57182],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.22704, -6.57182]
+    }
+  },
+  {
+    "id": "19",
+    "type": "Feature",
+    "place_type": ["mountain", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "673 mdpl",
+    "place_name": "Gunung Lembu",
+    "center": [107.34027, -6.56148],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.34027, -6.56148]
+    }
+  },
+  {
+    "id": "20",
+    "type": "Feature",
+    "place_type": ["basecamp", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "Pos Tiket Pendakian via Sukatani",
+    "place_name": "BC Gunung Lembu via Sukatani",
+    "center": [107.341, -6.57317],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.341, -6.57317]
+    }
+  },
+  {
+    "id": "21",
+    "type": "Feature",
+    "place_type": ["cliff", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "650 mdpl",
+    "place_name": "Tebing Parang",
+    "center": [107.34620, -6.58816],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [107.34620, -6.58816]
+    }
+  },
+  {
+    "id": "22",
+    "type": "Feature",
+    "place_type": ["cave", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "-",
+    "place_name": "Gua Citamiang",
+    "center": [106.93012, -6.51773],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.93012, -6.51773]
+    }
+  },
+  {
+    "id": "23",
+    "type": "Feature",
+    "place_type": ["cave", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "-",
+    "place_name": "Gua Ciasem",
+    "center": [106.93106, -6.52156],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.93106, -6.52156]
+    }
+  },
+  {
+    "id": "24",
+    "type": "Feature",
+    "place_type": ["cliff", "custom"],
+    "relevance": 1,
+    "properties": {
+      "mapbox_id": null,
+      "wikidata": null
+    },
+    "text": "403 mdpl",
+    "place_name": "Tebing Jeger",
+    "center": [106.93633, -6.52188],
+    "geometry": {
+      "type": "Point",
+      "coordinates": [106.93633, -6.52188]
+    }
+  }
+]

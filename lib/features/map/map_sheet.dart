@@ -14,6 +14,8 @@ import '../../domain/share/share_location.dart';
 import '../../domain/terrain/contours.dart';
 import '../guide/quick_guide.dart';
 import 'map_settings_controller.dart';
+import 'map_tools_state.dart';
+import 'search_page.dart';
 
 /// Height of the sheet's always-visible part (grabber, header, section tabs) until it has
 /// been measured, without the bottom safe area
@@ -189,17 +191,63 @@ class _Header extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
+          // Same header icons as the mobile web: Guide, Weather, Search (no app sharing here)
+          _HeaderButton(
             key: const Key('guide'),
             tooltip: 'Quick Guide',
-            icon: const Icon(Icons.help_outline),
+            icon: Icons.help_outline,
             onPressed: () => showQuickGuide(context),
+          ),
+          _HeaderButton(
+            key: const Key('weather'),
+            tooltip: 'Weather',
+            icon: ref.watch(weatherShownProvider) ? Icons.wb_cloudy : Icons.wb_cloudy_outlined,
+            active: ref.watch(weatherShownProvider),
+            onPressed: () => ref.read(weatherShownProvider.notifier).toggle(),
+          ),
+          _HeaderButton(
+            key: const Key('search'),
+            tooltip: 'Search location',
+            icon: Icons.search,
+            onPressed: () async {
+              final r = await showPlaceSearch(context);
+              if (r != null) ref.read(flyToProvider.notifier).go(r.lng, r.lat);
+            },
           ),
           _AccountButton(profile: profile),
         ],
       ),
     );
   }
+}
+
+class _HeaderButton extends StatelessWidget {
+  const _HeaderButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.active = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    visualDensity: VisualDensity.compact,
+    constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+    padding: EdgeInsets.zero,
+    color: active ? L360Colors.forest700 : null,
+    icon: Icon(icon),
+    onPressed: () {
+      HapticFeedback.selectionClick();
+      onPressed();
+    },
+  );
 }
 
 class _AccountButton extends StatelessWidget {
@@ -213,6 +261,8 @@ class _AccountButton extends StatelessWidget {
     final name = p == null ? '' : (p.displayName.isEmpty ? p.email : p.displayName);
     return IconButton(
       key: const Key('account-button'),
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      padding: EdgeInsets.zero,
       tooltip: p == null ? 'Sign in' : 'User Account',
       onPressed: () => context.push(p == null ? '/login' : '/account'),
       icon: p == null
@@ -292,13 +342,13 @@ class _SectionTabs extends StatelessWidget {
 
 // --- Tools -----------------------------------------------------------------------------------
 
-class _ToolsSection extends StatelessWidget {
+class _ToolsSection extends ConsumerWidget {
   const _ToolsSection();
 
   // Same tools, order and short names as the web's phone layout (ControlPanel.tsx)
   static const tools = [
     (Icons.straighten, 'Navigator', 5),
-    (Icons.alt_route, 'Route', 4),
+    (Icons.alt_route, 'Route', null),
     (Icons.place_outlined, 'POIs', 7),
     (Icons.directions_walk, 'Track', 6),
     (Icons.pin_drop_outlined, 'Marked', 7),
@@ -306,13 +356,18 @@ class _ToolsSection extends StatelessWidget {
     (Icons.layers_outlined, 'Basemaps', 7),
   ];
 
+  static void _toggleRoute(WidgetRef ref) {
+    final planner = ref.read(routePlannerProvider.notifier);
+    ref.read(routePlannerProvider).enabled ? planner.disable() : planner.enable();
+  }
+
   static const _columns = 4;
   static const _gap = 10.0;
 
   // Square tiles of one exact size (a quarter of the width less the gaps); a shorter last
   // row is centered so the grid has no hole on the right
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
+  Widget build(BuildContext context, WidgetRef ref) => LayoutBuilder(
     builder: (context, constraints) {
       final side = ((constraints.maxWidth - _gap * (_columns - 1)) / _columns).floorToDouble();
       return Wrap(
@@ -323,7 +378,13 @@ class _ToolsSection extends StatelessWidget {
           for (final (icon, label, phase) in tools)
             SizedBox.square(
               dimension: side,
-              child: ToolTile(icon: icon, label: label, availableInPhase: phase),
+              child: ToolTile(
+                icon: icon,
+                label: label,
+                availableInPhase: phase,
+                active: label == 'Route' && ref.watch(routePlannerProvider.select((s) => s.enabled)),
+                onTap: label == 'Route' ? () => _toggleRoute(ref) : null,
+              ),
             ),
         ],
       );
@@ -333,21 +394,29 @@ class _ToolsSection extends StatelessWidget {
 
 /// A tool of the Tools section. Tools that are not in the app yet show "Soon".
 class ToolTile extends StatelessWidget {
-  const ToolTile({super.key, required this.icon, required this.label, this.availableInPhase, this.onTap});
+  const ToolTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.availableInPhase,
+    this.onTap,
+    this.active = false,
+  });
 
   final IconData icon;
   final String label;
   final int? availableInPhase; // set while the tool is not built yet
   final VoidCallback? onTap;
+  final bool active; // the tool is switched on
 
   bool get enabled => availableInPhase == null && onTap != null;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: L360Colors.sand50,
+    color: active ? L360Colors.forest50 : L360Colors.sand50,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(14),
-      side: const BorderSide(color: L360Colors.sand200),
+      side: BorderSide(color: active ? L360Colors.forest200 : L360Colors.sand200),
     ),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
@@ -372,22 +441,30 @@ class ToolTile extends StatelessWidget {
               Container(
                 width: 34,
                 height: 34,
-                decoration: BoxDecoration(color: L360Colors.sand100, borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, size: 19, color: L360Colors.sand700),
+                decoration: BoxDecoration(
+                  color: active ? L360Colors.forest700 : L360Colors.sand100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 19, color: active ? Colors.white : L360Colors.sand700),
               ),
               const SizedBox(height: 6),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   height: 1.2,
                   fontWeight: FontWeight.w700,
-                  color: L360Colors.sand700,
+                  color: active ? L360Colors.ink : L360Colors.sand700,
                 ),
               ),
-              if (!enabled)
+              if (active)
+                const Text(
+                  'Active',
+                  style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: L360Colors.forest700),
+                )
+              else if (!enabled)
                 const Text(
                   'Soon',
                   style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: L360Colors.sand500),

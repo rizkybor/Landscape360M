@@ -71,3 +71,22 @@ Status 28 Oktober 2026: Fase 1 dan Fase 3 lulus di iPhone 13 (iOS 26.7) dengan a
 | 4b.10 | Grid interval 30" | Grid tetap 30" walau zoom berubah | | |
 | 4b.11 | Geser peta, berhenti | Elev, kontur dan grid diperbarui ±0,5 detik setelah peta berhenti | | |
 | 4b.12 | Mode 2D | Kontrol kontur & exaggeration redup dengan petunjuk "Contours work in 3D…"; grid tetap bisa diatur | | |
+
+## Fase 4c — Cuaca, pencarian, route planner
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 4c.1 | Izin lokasi sudah diberikan, header sheet → ikon awan | Kartu cuaca BMKG untuk **kelurahan Anda** (mis. "Cipete Utara, Kebayoran Baru" · "Kota Adm. Jakarta Selatan · Near your location"): suhu, kondisi, kelembapan, angin, 3 hari | | |
+| 4c.1b | Tolak izin lokasi, geser peta ke Bandung, buka cuaca | Kelurahan di tengah peta, keterangan "Map centre" | | |
+| 4c.1c | Geser peta ke luar Indonesia (mis. Singapura), buka cuaca | "Outside BMKG coverage · Jakarta Pusat" | | |
+| 4c.2 | Ketuk judul kartu cuaca | Mengecil jadi pil "32°C · Berawan"; ketuk lagi membesar; X menutup | | |
+| 4c.3 | Mode pesawat, buka cuaca | "Gagal memuat data cuaca." + Try again, tidak crash | | |
+| 4c.4 | Header → ikon kaca pembesar, ketik "gede" | Verified Locations (Gunung Gede dsb.) di atas, lalu Places dari Mapbox | | |
+| 4c.5 | Pilih hasil | Peta terbang ke tempat itu (zoom 16) | | |
+| 4c.6 | Ketik "-6.77, 106.98" | Muncul "Coordinate search (Lat, Lon)" dan hasil di titik itu | | |
+| 4c.7 | Mode pesawat, cari "gede" | Verified Locations tetap muncul (dari cache / daftar bawaan) | | |
+| 4c.8 | Tools → Route | Sheet turun, panel Route Planner muncul; tile Route bertanda Active | | |
+| 4c.9 | Ketuk peta dua kali | Titik Start (hijau) dan Destination (oranye); rute tergambar dan peta menyesuaikan; jarak & waktu muncul | | |
+| 4c.10 | Ganti mode No toll / Walk | Rute dihitung ulang, warna garis berubah (emas / hijau) | | |
+| 4c.11 | Tukar (⇅), Clear, Recalculate | Bekerja sesuai nama; ketukan ketiga memulai rute baru | | |
+| 4c.12 | Tutup panel (X) | Rute dan titik hilang dari peta; ketukan peta tidak lagi menambah titik | | |

@@ -16,11 +16,16 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
 import '../../domain/compass/device_heading.dart';
 import '../../domain/map/map_settings.dart';
+import '../../domain/route/route_planner.dart';
 import 'location_puck.dart';
 import 'map_settings_controller.dart';
 import 'map_sheet.dart';
+import 'map_tools_state.dart';
+import 'route_layer.dart';
+import 'route_panel.dart';
 import 'telemetry_card.dart';
 import 'terrain_layers.dart';
+import 'weather_card.dart';
 
 /// Home screen: the Mapbox map (2D / 3D terrain), the user's location, the telemetry of the
 /// point under the crosshair and the Tools / Map / Terrain sheet. Like the web, it works
@@ -148,6 +153,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Light status bar over satellite imagery, dark over the light Streets / Outdoors maps
     final dark = ref.watch(mapSettingsProvider.select((s) => s.style == MapStyle.satellite));
     final sheetInset = _headerHeight + MediaQuery.paddingOf(context).bottom;
+    // Opening a tool lowers the sheet so the map is free (like the web)
+    ref.listen(routePlannerProvider.select((s) => s.enabled), (prev, enabled) {
+      if (enabled && _sheet.isAttached) {
+        _sheet.animateTo(peek, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+      }
+    });
+    final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
@@ -172,6 +184,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 bodyVisibility: _bodyVisibility,
               ),
             ),
+            if (routeOpen && _bodyVisibility == 0)
+              Positioned(left: 12, right: 12, bottom: sheetInset + 10, child: const RoutePanel()),
           ],
         ),
       ),
@@ -214,6 +228,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   bool _telemetryOpen = false;
 
   TerrainLayers? _layers;
+  RouteLayer? _route;
 
   // Compass: the needle follows the phone when it has a compass, else the GPS course
   StreamSubscription<CompassEvent>? _compassSub;
@@ -303,6 +318,16 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       ),
     );
     await map.setBounds(CameraBoundsOptions(minZoom: minZoom, maxZoom: maxZoom, maxPitch: maxPitch));
+    // Taps on the map set route points while the route planner is open
+    map.addInteraction(
+      TapInteraction.onMap((context) {
+        if (!ref.read(routePlannerProvider).enabled) return;
+        HapticFeedback.lightImpact();
+        final c = context.point.coordinates;
+        unawaited(ref.read(routePlannerProvider.notifier).tap((lng: c.lng.toDouble(), lat: c.lat.toDouble())));
+      }, stopPropagation: false),
+      interactionID: 'route-planner-tap',
+    );
     // Our own controls replace the built-in compass and scale bar
     await map.compass.updateSettings(CompassSettings(enabled: false));
     await map.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
@@ -324,6 +349,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
         );
       }
       await _applyTerrain(ref.read(mapSettingsProvider));
+      final route = _route ??= RouteLayer(map);
+      await route.install();
+      await route.show(ref.read(routePlannerProvider));
       final layers = _layers ??= TerrainLayers(map);
       await layers.install(ref.read(mapSettingsProvider));
       _scheduleSettled();
@@ -506,6 +534,19 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     }
   }
 
+  /// Whole route in view, clear of the controls and the route panel (like fitBounds on the web)
+  Future<void> _fitRoute(RouteResult r) async {
+    final map = _map;
+    if (map == null) return;
+    final camera = await map.cameraForCoordinates(
+      [for (final p in r.coordinates) Point(coordinates: Position(p.lng, p.lat))],
+      MbxEdgeInsets(top: 140, left: 40, bottom: _sheetInset + 300, right: 80),
+      null,
+      null,
+    );
+    await map.flyTo(camera, MapAnimationOptions(duration: 800));
+  }
+
   Future<void> _zoomBy(double delta) async {
     final map = _map;
     if (map == null) return;
@@ -526,6 +567,24 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(mapSettingsProvider);
+    ref.listen<RoutePlannerState>(routePlannerProvider, (prev, next) {
+      unawaited(_route?.show(next));
+      if (next.result != null && prev?.result != next.result) unawaited(_fitRoute(next.result!));
+    });
+    ref.listen<FlyTarget?>(flyToProvider, (_, target) {
+      final map = _map;
+      if (target == null || map == null) return;
+      ref.read(flyToProvider.notifier).done();
+      unawaited(
+        map.flyTo(
+          CameraOptions(
+            center: Point(coordinates: Position(target.lng, target.lat)),
+            zoom: target.zoom,
+          ),
+          MapAnimationOptions(duration: 1200),
+        ),
+      );
+    });
     ref.listen<MapSettings>(mapSettingsProvider, (prev, next) {
       final map = _map;
       if (map == null || prev == null) return;
@@ -575,12 +634,21 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
         Positioned(
           left: 12,
           top: top,
-          child: TelemetryCard(
-            telemetry: _telemetry,
-            format: settings.coordFormat,
-            onFormatChanged: ref.read(mapSettingsProvider.notifier).setCoordFormat,
-            expanded: _telemetryOpen,
-            onToggle: () => setState(() => _telemetryOpen = !_telemetryOpen),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TelemetryCard(
+                telemetry: _telemetry,
+                format: settings.coordFormat,
+                onFormatChanged: ref.read(mapSettingsProvider.notifier).setCoordFormat,
+                expanded: _telemetryOpen,
+                onToggle: () => setState(() => _telemetryOpen = !_telemetryOpen),
+              ),
+              if (ref.watch(weatherShownProvider)) ...[
+                const SizedBox(height: 10),
+                WeatherCard(mapCenter: () => (lat: _telemetry.lat, lng: _telemetry.lng)),
+              ],
+            ],
           ),
         ),
         Positioned(

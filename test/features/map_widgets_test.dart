@@ -161,14 +161,20 @@ void main() {
       expect(rects[4].top - rects[0].bottom, closeTo(10, 0.01));
     });
 
-    testWidgets('header offers the guide and signing in; tools not built yet say so', (tester) async {
+    testWidgets('header offers guide, weather, search and signing in; tools not built yet say so', (tester) async {
       await pump(tester);
       // No app sharing in the native app
       expect(find.byKey(const Key('share-app')), findsNothing);
+      expect(find.byKey(const Key('weather')), findsOneWidget);
+      expect(find.byKey(const Key('search')), findsOneWidget);
       expect(find.byType(BrandName), findsOneWidget);
       expect(find.byTooltip('Sign in'), findsOneWidget);
       // Same tools as the web's phone layout
-      for (final name in ['Navigator', 'Route', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps']) {
+      expect(
+        tester.widget<ToolTile>(find.ancestor(of: find.text('Route'), matching: find.byType(ToolTile))).enabled,
+        isTrue,
+      );
+      for (final name in ['Navigator', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps']) {
         expect(
           tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
           isFalse,

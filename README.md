@@ -12,7 +12,7 @@ spesifikasi di `docs/flutter-spec.md`.
 | 1 Fondasi | Selesai untuk Android (flavor dev/prod, tema, font Inter, router, CI). iOS flavor menunggu Xcode |
 | 2 Port logika | Selesai: `lib/domain`, dibandingkan dengan output web asli |
 | 3 Akun | Selesai, lulus uji di iPhone dengan akun production |
-| 4 Peta | 4a (peta, 2D/3D, lokasi, telemetry, sheet) dan 4b (jarum kompas, kontur, grid DMS) selesai, menunggu uji di HP. 4c cuaca/search/route belum |
+| 4 Peta | Selesai: 4a (peta, 2D/3D, lokasi, telemetry, sheet), 4b (jarum kompas, kontur, grid DMS), 4c (cuaca BMKG, pencarian, route planner). Menunggu uji di HP |
 | 5–10 | Belum |
 
 ## Menjalankan
