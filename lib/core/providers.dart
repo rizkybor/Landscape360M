@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/account/account_repository.dart';
 import '../data/api/api_client.dart';
+import '../domain/account/account_rules.dart';
 import '../domain/account/profile.dart';
 import 'config/app_config.dart';
 
@@ -56,4 +57,11 @@ final profileProvider = FutureProvider<AccountProfile?>((ref) async {
   final userId = ref.watch(authUserIdProvider).value;
   if (userId == null) return null;
   return ref.watch(accountRepositoryProvider).loadProfile();
+});
+
+/// Cloud storage of the signed-in account (null when signed out)
+final storageUsageProvider = FutureProvider<MyStorageUsage?>((ref) async {
+  final userId = ref.watch(authUserIdProvider).value;
+  if (userId == null) return null;
+  return ref.watch(accountRepositoryProvider).loadStorageUsage();
 });

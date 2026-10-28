@@ -11,8 +11,9 @@ spesifikasi di `docs/flutter-spec.md`.
 | 0 Spesifikasi | `docs/flutter-spec.md` (perlu persetujuan, lihat pertanyaan Q1–Q22) |
 | 1 Fondasi | Selesai untuk Android (flavor dev/prod, tema, font Inter, router, CI). iOS flavor menunggu Xcode |
 | 2 Port logika | Selesai: `lib/domain`, dibandingkan dengan output web asli |
-| 3 Akun | Kode + test selesai; perlu uji dengan data production (`docs/mobile-test-checklist.md`) |
-| 4–10 | Belum |
+| 3 Akun | Selesai, lulus uji di iPhone dengan akun production |
+| 4 Peta | 4a (peta, 2D/3D, lokasi, telemetry, sheet) selesai, menunggu uji di HP. 4b kompas/kontur/grid, 4c cuaca/search/route belum |
+| 5–10 | Belum |
 
 ## Menjalankan
 

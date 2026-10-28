@@ -6,8 +6,12 @@ import 'package:landscape360/core/providers.dart';
 import 'package:landscape360/core/router.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/domain/account/profile.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  setUp(() => SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty());
+
   Future<void> pump(WidgetTester tester, {required bool signedIn, required String start}) async {
     final router = buildRouter(isSignedIn: () => signedIn);
     router.go(start);
@@ -19,7 +23,7 @@ void main() {
               flavor: 'dev',
               supabaseUrl: 'https://x.supabase.co',
               supabaseAnonKey: 'sb_publishable_x',
-              mapboxPublicToken: 'pk.x',
+              mapboxPublicToken: '', // no native map in widget tests
               apiBaseUrl: 'https://landscape360.jcdigital.co.id',
             ),
           ),
@@ -51,8 +55,9 @@ void main() {
 
   testWidgets('signed out: the map opens without signing in', (tester) async {
     await pump(tester, signedIn: false, start: '/');
-    expect(find.text('Explore without Limits'), findsOneWidget);
+    expect(find.textContaining('MAPBOX_PUBLIC_TOKEN'), findsOneWidget);
     expect(find.byTooltip('Sign in'), findsOneWidget);
+    expect(find.byKey(const Key('locate-me')), findsNothing);
   });
 
   testWidgets('signed in: the account page shows the profile, sign-in redirects there', (tester) async {

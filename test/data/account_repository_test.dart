@@ -44,6 +44,14 @@ class FakeBackend implements AccountBackend {
     if (rpcHangs) await Completer<void>().future;
   }
 
+  List<dynamic>? rows;
+
+  @override
+  Future<List<dynamic>?> rpcRows(String fn) async {
+    calls.add('rows:$fn');
+    return rows;
+  }
+
   @override
   Future<Map<String, dynamic>?> profileRow(String userId) async {
     if (profileError != null) throw profileError!;
@@ -194,6 +202,31 @@ void main() {
         ..row = {'status_subscribe': 'Ultimate', 'status_user': 'hacker'};
       final p = (await repo().loadProfile())!;
       expect((p.plan, p.role), (Plan.free, UserRole.pengguna360));
+    });
+
+    test('reads the storage usage like the web (bigint as text, unlimited as null)', () async {
+      backend.rows = [
+        {
+          'tracks_bytes': 1024,
+          'locations_bytes': '2048',
+          'surveys_bytes': 0,
+          'basemaps_bytes': 0,
+          'used_bytes': 3072,
+          'limit_bytes': 10485760,
+        },
+      ];
+      final u = (await repo().loadStorageUsage())!;
+      expect(backend.calls, ['rows:my_storage_usage']);
+      expect((u.usedBytes, u.limitBytes, u.locations), (3072, 10485760, 2048));
+      expect(u.breakdown.map((b) => b.$1), ['Tracks', 'Marked Locations', 'Surveys', 'Custom Basemaps']);
+      expect(u.percent, closeTo(0.0293, 1e-4));
+
+      backend.rows = [
+        {'used_bytes': 5, 'limit_bytes': null},
+      ];
+      expect((await repo().loadStorageUsage())!.percent, isNull);
+      backend.rows = [];
+      expect(await repo().loadStorageUsage(), isNull);
     });
 
     test('edit profile writes the name and the contact through the RPC', () async {

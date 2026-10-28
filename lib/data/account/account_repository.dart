@@ -16,6 +16,7 @@ abstract interface class AccountBackend {
   Future<void> signIn(String email, String password);
   Future<void> signOut({bool others = false});
   Future<void> rpc(String fn, Map<String, dynamic> params);
+  Future<List<dynamic>?> rpcRows(String fn);
   Future<Map<String, dynamic>?> profileRow(String userId);
   Future<void> updatePassword(String password);
   Future<void> updateDisplayName(String name);
@@ -39,6 +40,9 @@ class SupabaseAccountBackend implements AccountBackend {
 
   @override
   Future<void> rpc(String fn, Map<String, dynamic> params) => client.rpc<void>(fn, params: params);
+
+  @override
+  Future<List<dynamic>?> rpcRows(String fn) async => await client.rpc<dynamic>(fn) as List<dynamic>?;
 
   @override
   Future<Map<String, dynamic>?> profileRow(String userId) => client
@@ -132,6 +136,10 @@ class AccountRepository {
     if (row != null) await prefs.setBool(_sosKey(user.id), profile.canUseSos);
     return profile;
   }
+
+  /// Cloud storage used by the account and its plan limit
+  Future<MyStorageUsage?> loadStorageUsage() async =>
+      MyStorageUsage.fromRows(await backend.rpcRows('my_storage_usage'));
 
   /// Edit Profile: display name in the auth metadata, organization and phone through the
   /// update_my_contact RPC (users cannot write `profiles` directly)

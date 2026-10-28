@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
+import 'account_screen.dart';
 
 const _supportEmail = 'contact@jcdigital.co.id';
 
@@ -31,14 +34,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await ref.read(accountRepositoryProvider).signIn(_email.text, _password.text);
+      await HapticFeedback.mediumImpact();
       if (mounted) context.go('/');
     } on AccountException catch (e) {
+      await HapticFeedback.heavyImpact();
       setState(() => _error = e.message);
     } on Object {
       setState(() => _error = 'Could not sign in. Check your connection and try again.');
@@ -60,69 +66,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
+      appBar: AppBar(),
       body: SafeArea(
+        top: false,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           children: [
+            Center(child: Image.asset('assets/images/logo.png', width: 96, height: 96)),
+            const SizedBox(height: 8),
+            Text('Welcome back', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 4),
             const Text(
-              'Landscape 360',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: L360Colors.forest700),
+              'Sign in to Landscape 360 to save surveys, tracks and places.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: L360Colors.sand600),
             ),
-            const Text('Explore without Limits', style: TextStyle(color: L360Colors.sand500)),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             AutofillGroup(
               child: Column(
                 children: [
-                  TextField(
-                    key: const Key('login-email'),
+                  FormFieldRow(
+                    fieldKey: const Key('login-email'),
                     controller: _email,
+                    label: 'Email',
+                    icon: Icons.mail_outline,
                     keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    autofill: const [AutofillHints.email, AutofillHints.username],
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    key: const Key('login-password'),
+                  FormFieldRow(
+                    fieldKey: const Key('login-password'),
                     controller: _password,
-                    obscureText: _obscure,
-                    autofillHints: const [AutofillHints.password],
+                    label: 'Password',
+                    icon: Icons.lock_outline,
+                    obscure: _obscure,
+                    autofill: const [AutofillHints.password],
+                    textInputAction: TextInputAction.go,
                     onSubmitted: (_) => _busy ? null : _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      suffixIcon: IconButton(
-                        tooltip: _obscure ? 'Show password' : 'Hide password',
-                        icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
+                    suffix: IconButton(
+                      tooltip: _obscure ? 'Show password' : 'Hide password',
+                      icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
+                      onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
                 ],
               ),
             ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(onPressed: _forgotPassword, child: const Text('Forgot password?')),
+            ),
             if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                key: const Key('login-error'),
-                style: const TextStyle(color: L360Colors.brick500),
-              ),
+              const SizedBox(height: 4),
+              KeyedSubtree(key: const Key('login-error'), child: ErrorBanner(_error!)),
             ],
-            const SizedBox(height: 20),
-            FilledButton(
+            const SizedBox(height: 16),
+            KeyedSubtree(
               key: const Key('login-submit'),
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Sign in'),
+              child: BusyButton(label: 'Sign in', busy: _busy, onPressed: _submit),
             ),
-            TextButton(onPressed: _forgotPassword, child: const Text('Forgot password?')),
-            const Divider(height: 32),
-            OutlinedButton(
-              onPressed: () => context.push('/request-account'),
-              child: const Text("Don't have an account? Request one"),
+            const SizedBox(height: 32),
+            const Row(
+              children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text("Don't have an account?", style: TextStyle(fontSize: 13, color: L360Colors.sand500)),
+                ),
+                Expanded(child: Divider()),
+              ],
             ),
+            const SizedBox(height: 16),
+            OutlinedButton(onPressed: () => context.push('/request-account'), child: const Text('Request an account')),
           ],
         ),
       ),

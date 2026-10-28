@@ -28,6 +28,50 @@ double? usagePercent(int usedBytes, int? limitBytes) {
   return p > 100 ? 100 : p;
 }
 
+/// Cloud storage of the signed-in account (my_storage_usage() RPC)
+class MyStorageUsage {
+  const MyStorageUsage({
+    required this.usedBytes,
+    required this.limitBytes,
+    required this.tracks,
+    required this.locations,
+    required this.surveys,
+    required this.basemaps,
+  });
+
+  /// From the first row the RPC returns; null without a row
+  static MyStorageUsage? fromRows(List<dynamic>? rows) {
+    if (rows == null || rows.isEmpty || rows.first is! Map) return null;
+    final r = rows.first as Map;
+    int n(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+    return MyStorageUsage(
+      usedBytes: n(r['used_bytes']),
+      limitBytes: r['limit_bytes'] == null ? null : n(r['limit_bytes']),
+      tracks: n(r['tracks_bytes']),
+      locations: n(r['locations_bytes']),
+      surveys: n(r['surveys_bytes']),
+      basemaps: n(r['basemaps_bytes']),
+    );
+  }
+
+  final int usedBytes;
+  final int? limitBytes; // null = unlimited
+  final int tracks;
+  final int locations;
+  final int surveys;
+  final int basemaps;
+
+  /// Same labels as STORAGE_CATEGORY_LABELS on the web
+  List<(String, int)> get breakdown => [
+    ('Tracks', tracks),
+    ('Marked Locations', locations),
+    ('Surveys', surveys),
+    ('Custom Basemaps', basemaps),
+  ];
+
+  double? get percent => usagePercent(usedBytes, limitBytes);
+}
+
 enum UsageLevel { normal, warning, critical }
 
 /// Bar colour level (web: forest / gold-400 at 70% / brick-500 at 90%)

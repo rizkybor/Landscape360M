@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
@@ -18,6 +19,8 @@ Future<void> main() async {
     runApp(ConfigErrorApp(problems: problems));
     return;
   }
+
+  if (config.mapboxPublicToken.isNotEmpty) MapboxOptions.setAccessToken(config.mapboxPublicToken);
 
   await Supabase.initialize(
     url: config.supabaseUrl,
