@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed --line-length 120 lib test
+      - run: flutter analyze
+      - run: flutter test
+
+  # The app must never ship a secret: fail the build if one is committed
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No secrets or build configs in the repo
+        run: |
+          set -e
+          if git ls-files | grep -E '^config/.*\.json$|\.jks$|\.keystore$|key\.properties$|\.p12$|\.mobileprovision$|\.netrc$'; then
+            echo "Build configuration or signing files are committed"; exit 1
+          fi
+          if git grep -nE 'service_role|sb_secret_|"sk\.[A-Za-z0-9]{20,}' -- ':!.github' ':!lib/core/config' ':!test' ':!docs' ':!*.md' ':!*.example'; then
+            echo "Possible secret found"; exit 1
+          fi
