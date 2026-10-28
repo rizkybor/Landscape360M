@@ -2,7 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:geolocator/geolocator.dart' as geo;
 
-// GPS fixes for the Track Recorder, kept coming while the screen is off or another app is in
+// GPS fixes for the Track Recorder and S.O.S, kept coming while the screen is off or another app is in
 // front: on Android a foreground service with a "Recording track" notification, on iOS the
 // background location mode (blue indicator in the status bar). Both start from the app in
 // front, so "While using the app" permission is enough.
@@ -85,9 +85,10 @@ class GeolocatorGpsSource implements GpsSource {
         distanceFilter: _distanceFilter,
         intervalDuration: const Duration(seconds: 2),
         foregroundNotificationConfig: const geo.ForegroundNotificationConfig(
-          notificationTitle: 'Recording track',
-          notificationText: 'Landscape 360 app is recording your track. Open the app to pause or finish.',
-          notificationChannelName: 'Track recording',
+          // Shared by the Track Recorder and S.O.S (one GPS stream for both)
+          notificationTitle: 'Landscape 360 is using GPS',
+          notificationText: 'Recording your track or sending S.O.S. Open the app to stop.',
+          notificationChannelName: 'GPS in the background',
           enableWakeLock: true,
           setOngoing: true,
         ),

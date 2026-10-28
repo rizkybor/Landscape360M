@@ -15,7 +15,8 @@ spesifikasi di `docs/flutter-spec.md`.
 | 4 Peta | Selesai: 4a (peta, 2D/3D, lokasi, telemetry, sheet), 4b (jarum kompas, kontur, grid DMS), 4c (cuaca BMKG, pencarian, route planner). Menunggu uji di HP |
 | 5 Navigator | Selesai: titik, lengkung Bezier, sudut tajam, Straight + snap sudut, banyak sheet, daftar titik (DD/DMS/UTM/Elev, azimuth, slope), simpan otomatis ke cloud (format sama dengan web) + offline. Menunggu uji di HP |
 | 6 Track Recorder | Selesai: rekam di HP dulu (SQLite) saat layar mati / di background, Online / Offline, pause / resume, pulih setelah app ditutup, sinkron ke `recorded_tracks`, daftar track sendiri + dibagikan, berbagi via email, GPX. Live tracking ditahan (kanal `tracking-room` publik). Menunggu uji di HP |
-| 6b–10 | Belum |
+| 6b S.O.S | Selesai tanpa push: tombol tahan 3 dtk, hitung mundur, layar darurat (DMS/UTM, 112/115, SMS kontak, share, sirene, senter Morse), laporan ke admin tiap 30 dtk lewat antrean offline yang jalan juga di background, panel admin (banner, penanda peta, resolve, hapus). Push notification menunggu Firebase + Apple Developer berbayar. Menunggu uji di HP |
+| 7–10 | Belum |
 
 ## Menjalankan
 

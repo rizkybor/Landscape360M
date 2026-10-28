@@ -9,6 +9,9 @@ import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import '../../domain/account/account_rules.dart';
 import '../../domain/account/profile.dart';
+import '../sos/sos_alerts.dart';
+import '../sos/sos_screen.dart';
+import '../sos/sos_state.dart';
 
 /// User Account: profile, plan / role badges, cloud storage, edit, password, sign out.
 /// Admins get a link to the admin panel, which stays on the web.
@@ -150,8 +153,34 @@ class _AccountBody extends ConsumerWidget {
           if (p.isAdmin)
             GroupedSection(
               title: 'Admin',
-              footer: 'Manage users, account requests, activity, broadcast and points of interest on the web.',
+              footer:
+                  'Manage users, account requests, activity, broadcast and points of interest on the web. '
+                  'S.O.S alerts are checked every 30 s while the app is open.',
               children: [
+                ListTile(
+                  key: const Key('admin-sos-alerts'),
+                  leading: const TileIcon(Icons.sos, color: L360Colors.brick500, background: L360Colors.brick50),
+                  title: const Text('S.O.S alerts'),
+                  subtitle: Consumer(
+                    builder: (context, ref, _) {
+                      final n = ref.watch(sosAlertsProvider.select((s) => s.active.length));
+                      return Text(n == 0 ? 'No active S.O.S' : '$n active');
+                    },
+                  ),
+                  trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                  onTap: () => showSosAlertsSheet(context),
+                ),
+                ListTile(
+                  key: const Key('admin-sos-open'),
+                  leading: const TileIcon(
+                    Icons.emergency_outlined,
+                    color: L360Colors.brick500,
+                    background: L360Colors.brick50,
+                  ),
+                  title: const Text('Open S.O.S screen'),
+                  subtitle: const Text('Admins raise S.O.S here; others hold the red button on the map'),
+                  onTap: () => openSosScreen(context, ref),
+                ),
                 ListTile(
                   leading: const TileIcon(
                     Icons.admin_panel_settings_outlined,

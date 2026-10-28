@@ -22,6 +22,9 @@ import '../../domain/tracks/track_recorder_geo.dart';
 import '../navigator/navigator_overlay.dart';
 import '../navigator/navigator_panel.dart';
 import '../navigator/navigator_state.dart';
+import '../sos/sos_alerts.dart';
+import '../sos/sos_button.dart';
+import '../sos/sos_state.dart';
 import '../tracks/track_layer.dart';
 import '../tracks/track_recorder_panel.dart';
 import '../tracks/track_recorder_state.dart';
@@ -176,6 +179,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
     final recordingHidden = !trackOpen && ref.watch(trackRecorderProvider.select((s) => s.active != null));
+    final sosAlerts = ref.watch(sosAlertsProvider.select((s) => s.active.isNotEmpty));
+    // Sends S.O.S reports left on the phone as soon as the app opens or the signal returns
+    ref.listen(sosProvider, (_, _) {});
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
@@ -211,6 +217,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (sosAlerts) ...[const SosBanner(), const SizedBox(height: 10)],
                     if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
                     if (routeOpen) const RoutePanel(),
                     if (navigatorOpen)
@@ -263,6 +270,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   TerrainLayers? _layers;
   RouteLayer? _route;
   TrackLayer? _tracks;
+  SosAlertsLayer? _sosLayer;
   Timer? _trackRedraw;
   final _cameraTick = ValueNotifier<int>(0);
   final _styleTick = ValueNotifier<int>(0);
@@ -411,6 +419,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       await route.show(ref.read(routePlannerProvider));
       final layers = _layers ??= TerrainLayers(map);
       await layers.install(ref.read(mapSettingsProvider));
+      final sos = _sosLayer ??= SosAlertsLayer(map);
+      await sos.install();
+      await sos.show(ref.read(sosAlertsProvider).active);
       final tracks = _tracks ??= TrackLayer(map);
       await tracks.install();
       await tracks.show(ref.read(trackRecorderProvider));
@@ -683,6 +694,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       // Recording shows where you are
       if (next.recording && !(prev?.recording ?? false) && !_puckOn) unawaited(_enablePuck());
     });
+    ref.listen<SosAlertsState>(sosAlertsProvider, (_, next) => unawaited(_sosLayer?.show(next.active)));
     ref.listen<SurveyDoc?>(showSurveyProvider, (_, doc) {
       final b = doc?.bounds;
       if (b == null || _map == null) return;
@@ -821,6 +833,8 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
                     ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.near_me, color: L360Colors.forest700),
               ),
+              const SizedBox(height: 14),
+              const SosButton(),
             ],
           ),
         ),

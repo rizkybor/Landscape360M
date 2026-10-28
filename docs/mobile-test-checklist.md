@@ -137,3 +137,28 @@ Live tracking (GPS Tracking ke monitor) belum ada di aplikasi sampai kanal `trac
 | 6.16 | Penerima → ⋯ → Remove from my list | Track hilang dari Shared | | |
 | 6.17 | ⋯ → Rename, ⋯ → Delete | Nama berubah (juga di web); track terhapus dari HP dan cloud | | |
 | 6.18 | Rekam 30 menit dengan layar mati | Jalur utuh, baterai wajar (catat % turun) | | |
+
+## Fase 6b — S.O.S (tanpa push notification)
+
+Akun uji: satu akun biasa dengan **S.O.S diizinkan** oleh admin (User Account di web), satu akun admin. Push notification ke HP admin belum ada (butuh Firebase dan akun Apple Developer berbayar); admin melihat S.O.S saat aplikasinya terbuka (dicek tiap 30 detik).
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 6b.1 | Akun tanpa izin S.O.S / akun admin | Tidak ada tombol SOS merah di peta | | |
+| 6b.2 | Akun dengan izin S.O.S: ketuk tombol SOS sekali | Tidak terjadi apa-apa | | |
+| 6b.3 | Tahan tombol SOS | "Keep holding… 3/2/1", getar tiap detik, cincin putih terisi; setelah 3 dtk layar merah hitung mundur 5 | | |
+| 6b.4 | Saat hitung mundur tekan Cancel | Kembali ke peta; admin tidak menerima apa pun | | |
+| 6b.5 | Biarkan hitung mundur selesai | "S.O.S ACTIVE", posisi DMS / desimal / UTM, elevasi, akurasi, baterai; "Sent to the admin hh:mm" | | |
+| 6b.6 | Admin (web atau app): S.O.S alerts | S.O.S muncul dengan posisi, baterai, waktu; di app admin: banner merah "1 active S.O.S · View" dan penanda merah di peta | | |
+| 6b.7 | Kirim pesan dari layar S.O.S | Admin melihat pesannya | | |
+| 6b.8 | Kunci layar HP 2 menit, jalan sedikit | Admin melihat posisi terus diperbarui (jumlah positions bertambah); iPhone: kapsul lokasi biru | | |
+| 6b.9 | Mode pesawat 2 menit, lalu matikan mode pesawat | Status "Waiting for signal…", lalu "Sent to the admin" sendiri setelah sinyal kembali | | |
+| 6b.10 | Emergency 112 / Basarnas 115 | Aplikasi Telepon terbuka dengan nomornya (jangan tekan panggil saat uji) | | |
+| 6b.11 | Emergency contacts → tambah 1 kontak → SMS (1) | Aplikasi Pesan terbuka dengan teks S.O.S berisi koordinat dan link peta | | |
+| 6b.12 | Share location | Lembar berbagi berisi teks S.O.S | | |
+| 6b.13 | Siren, dengan tombol senyap iPhone menyala | Sirene tetap berbunyi; Stop siren menghentikan | | |
+| 6b.14 | S.O.S light | Senter dan layar berkedip pola ··· ——— ··· | | |
+| 6b.15 | Layar dibiarkan 5 menit | Layar tidak meredup / terkunci sendiri | | |
+| 6b.16 | I'm safe (dalam mode pesawat), lalu online lagi | Layar tertutup; setelah online, admin melihat S.O.S berstatus RESOLVED | | |
+| 6b.17 | Admin: Show on map / Call / WhatsApp / Mark resolved + catatan / Delete di History | Sesuai nama; banner hilang setelah resolved | | |
+| 6b.18 | Admin: halaman akun → Open S.O.S screen | Layar S.O.S yang sama terbuka (admin tidak punya tombol di peta) | | |
