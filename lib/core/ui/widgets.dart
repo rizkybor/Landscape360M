@@ -238,3 +238,54 @@ class RenderMeasureSize extends RenderProxyBox {
     WidgetsBinding.instance.addPostFrameCallback((_) => onChange(size));
   }
 }
+
+/// "Landscape 360 app": the product name of the mobile app, with "app" in the ember orange
+/// of the logo's pin
+class BrandName extends StatelessWidget {
+  const BrandName({super.key, this.fontSize = 17, this.color = L360Colors.forest800, this.textAlign});
+
+  final double fontSize;
+  final Color color;
+  final TextAlign? textAlign;
+
+  @override
+  Widget build(BuildContext context) => Text.rich(
+    TextSpan(
+      children: brandSpans(fontSize: fontSize, color: color, weight: FontWeight.w700),
+    ),
+    textAlign: textAlign,
+    style: TextStyle(fontSize: fontSize, letterSpacing: -0.3),
+  );
+}
+
+/// The brand inside a sentence: "Landscape 360 " in the sentence's colour, then a smaller
+/// ember "app" raised so its top lines up with the top of "360"
+List<InlineSpan> brandSpans({double fontSize = 14, Color? color, FontWeight? weight}) => [
+  TextSpan(
+    text: 'Landscape 360 ',
+    style: TextStyle(fontSize: fontSize, color: color, fontWeight: weight),
+  ),
+  WidgetSpan(
+    alignment: PlaceholderAlignment.baseline,
+    baseline: TextBaseline.alphabetic,
+    child: Transform.translate(
+      // Inter: digits are ~0.73 em tall, lowercase ~0.55 em; lift by the difference
+      offset: Offset(0, -fontSize * (_interDigitHeight - _interXHeight * brandAppScale)),
+      child: Text(
+        'app',
+        style: TextStyle(
+          fontSize: fontSize * brandAppScale,
+          color: L360Colors.ember500,
+          fontWeight: weight ?? FontWeight.w700,
+          letterSpacing: 0,
+          height: 1,
+        ),
+      ),
+    ),
+  ),
+];
+
+/// Size of "app" relative to "Landscape 360"
+const brandAppScale = 0.65;
+const _interDigitHeight = 0.727;
+const _interXHeight = 0.546;

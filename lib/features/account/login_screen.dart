@@ -74,12 +74,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           children: [
             Center(child: Image.asset('assets/images/logo.png', width: 96, height: 96)),
             const SizedBox(height: 8),
+            const BrandName(fontSize: 15, textAlign: TextAlign.center),
+            const SizedBox(height: 10),
             Text('Welcome back', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 4),
-            const Text(
-              'Sign in to Landscape 360 to save surveys, tracks and places.',
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: 'Sign in to '),
+                  ...brandSpans(),
+                  const TextSpan(text: ' to save surveys, tracks and places.'),
+                ],
+              ),
               textAlign: TextAlign.center,
-              style: TextStyle(color: L360Colors.sand600),
+              style: const TextStyle(color: L360Colors.sand600),
             ),
             const SizedBox(height: 28),
             AutofillGroup(

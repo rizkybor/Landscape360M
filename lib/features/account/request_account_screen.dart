@@ -112,7 +112,7 @@ class _RequestAccountScreenState extends ConsumerState<RequestAccountScreen> {
       ),
       FormFieldRow(
         controller: _message,
-        label: 'How will you use Landscape 360?',
+        label: 'How will you use Landscape 360 app?',
         icon: Icons.chat_bubble_outline,
         maxLines: 4,
         maxLength: 1000,

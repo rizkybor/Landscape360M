@@ -35,8 +35,14 @@ const defaultZoom = 14.0;
 /// Pitch used when switching to 3D (the web keeps the last one)
 const defaultPitch3D = 60.0;
 const defaultExaggeration = 1.5;
-const minExaggeration = 1.0;
-const maxExaggeration = 3.0;
+// Web slider: 0..10 in steps of 0.1. 0 would flatten the terrain completely and make the
+// elevation unreadable (it is divided by the exaggeration), so the app starts at 0.1.
+const minExaggeration = 0.1;
+const maxExaggeration = 10.0;
+
+const defaultContourInterval = 50.0;
+const defaultContourOpacity = 0.8;
+const defaultGridOpacity = 0.5;
 
 class MapSettings {
   const MapSettings({
@@ -44,16 +50,31 @@ class MapSettings {
     this.view = MapView.twoD,
     this.exaggeration = defaultExaggeration,
     this.coordFormat = CoordFormat.dd,
+    this.showContours = true,
+    this.contourInterval = defaultContourInterval,
+    this.contourOpacity = defaultContourOpacity,
+    this.showGrid = false,
+    this.gridOpacity = defaultGridOpacity,
+    this.gridStep,
   });
 
   /// Reads saved settings; anything missing or invalid falls back to the default.
   /// The view always opens in 2D, as on the web.
   factory MapSettings.fromJson(Map<String, dynamic> j) {
+    double num01(Object? v, double fallback) => v is num ? v.toDouble().clamp(0.0, 1.0) : fallback;
     final ex = j['exaggeration'];
+    final interval = j['contourInterval'];
+    final step = j['gridStep'];
     return MapSettings(
       style: MapStyle.fromName(j['style'] as String?),
       exaggeration: ex is num ? ex.toDouble().clamp(minExaggeration, maxExaggeration) : defaultExaggeration,
       coordFormat: j['coordFormat'] == 'dms' ? CoordFormat.dms : CoordFormat.dd,
+      showContours: j['showContours'] is bool ? j['showContours'] as bool : true,
+      contourInterval: interval is num ? interval.toDouble().clamp(10.0, 500.0) : defaultContourInterval,
+      contourOpacity: num01(j['contourOpacity'], defaultContourOpacity),
+      showGrid: j['showGrid'] == true,
+      gridOpacity: num01(j['gridOpacity'], defaultGridOpacity),
+      gridStep: step is num && step > 0 ? step.toDouble() : null,
     );
   }
 
@@ -62,20 +83,54 @@ class MapSettings {
   final double exaggeration;
   final CoordFormat coordFormat;
 
+  final bool showContours;
+  final double contourInterval; // meters
+  final double contourOpacity; // 0..1
+  final bool showGrid;
+  final double gridOpacity; // 0..1
+  final double? gridStep; // degrees; null = automatic by zoom
+
   bool get is3D => view == MapView.threeD;
 
   /// Terrain exaggeration applied to the map: flat looking in 2D (1×, seen from straight
   /// above), the chosen factor in 3D. Terrain stays on in both so elevation can be read.
   double get appliedExaggeration => is3D ? exaggeration : 1.0;
 
-  MapSettings copyWith({MapStyle? style, MapView? view, double? exaggeration, CoordFormat? coordFormat}) => MapSettings(
+  MapSettings copyWith({
+    MapStyle? style,
+    MapView? view,
+    double? exaggeration,
+    CoordFormat? coordFormat,
+    bool? showContours,
+    double? contourInterval,
+    double? contourOpacity,
+    bool? showGrid,
+    double? gridOpacity,
+    double? Function()? gridStep,
+  }) => MapSettings(
     style: style ?? this.style,
     view: view ?? this.view,
     exaggeration: exaggeration ?? this.exaggeration,
     coordFormat: coordFormat ?? this.coordFormat,
+    showContours: showContours ?? this.showContours,
+    contourInterval: contourInterval ?? this.contourInterval,
+    contourOpacity: contourOpacity ?? this.contourOpacity,
+    showGrid: showGrid ?? this.showGrid,
+    gridOpacity: gridOpacity ?? this.gridOpacity,
+    gridStep: gridStep == null ? this.gridStep : gridStep(),
   );
 
-  Map<String, dynamic> toJson() => {'style': style.name, 'exaggeration': exaggeration, 'coordFormat': coordFormat.name};
+  Map<String, dynamic> toJson() => {
+    'style': style.name,
+    'exaggeration': exaggeration,
+    'coordFormat': coordFormat.name,
+    'showContours': showContours,
+    'contourInterval': contourInterval,
+    'contourOpacity': contourOpacity,
+    'showGrid': showGrid,
+    'gridOpacity': gridOpacity,
+    'gridStep': gridStep,
+  };
 }
 
 /// Terrain slope in degrees at a point, from its elevation and the elevations ~11 m east

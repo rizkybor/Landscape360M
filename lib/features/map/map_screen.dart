@@ -1,20 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
+import '../../domain/compass/device_heading.dart';
 import '../../domain/map/map_settings.dart';
+import 'location_puck.dart';
 import 'map_settings_controller.dart';
 import 'map_sheet.dart';
 import 'telemetry_card.dart';
+import 'terrain_layers.dart';
 
 /// Home screen: the Mapbox map (2D / 3D terrain), the user's location, the telemetry of the
 /// point under the crosshair and the Tools / Map / Terrain sheet. Like the web, it works
@@ -207,15 +213,81 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   bool _telemetryOpen = false;
 
+  TerrainLayers? _layers;
+
+  // Compass: the needle follows the phone when it has a compass, else the GPS course
+  StreamSubscription<CompassEvent>? _compassSub;
+  final _quality = CompassQualityTracker();
+  bool? _hasCompass;
+  bool _showCalibrateHint = false;
+  bool _hintUsed = true; // until the saved choice is read
+  Timer? _hintTimer;
+  final _prefs = SharedPreferencesAsync();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      _prefs.getBool(compassHintDismissedKey).then((v) => _hintUsed = v ?? false, onError: (_) => _hintUsed = false),
+    );
+    final events = FlutterCompass.events;
+    _compassSub = events?.listen(_onCompass, onError: (_) {});
+    // No compass readings (no sensor): point the beam along the GPS course instead
+    Timer(Duration(seconds: events == null ? 0 : 3), () {
+      if (!mounted || _hasCompass != null) return;
+      _hasCompass = false;
+      if (_puckOn) unawaited(_enablePuck());
+    });
+  }
+
+  @override
+  void dispose() {
+    _compassSub?.cancel();
+    _hintTimer?.cancel();
+    _layers?.dispose();
+    _settle?.cancel();
+    super.dispose();
+  }
+
+  void _onCompass(CompassEvent e) {
+    final reading = readPluginCompass(heading: e.heading, accuracy: e.accuracy, android: Platform.isAndroid);
+    if (reading == null) return;
+    final q = _quality.push(reading, DateTime.now().millisecondsSinceEpoch);
+    // A small one-time hint while the compass looks off; gone once it settles
+    if (q == CompassQuality.poor && !_hintUsed) {
+      _hintUsed = true;
+      setState(() => _showCalibrateHint = true);
+      _hintTimer = Timer(const Duration(seconds: 12), () {
+        if (mounted) setState(() => _showCalibrateHint = false);
+      });
+    } else if (q == CompassQuality.ok && _showCalibrateHint) {
+      setState(() => _showCalibrateHint = false);
+    }
+    if (reading.heading != null && _hasCompass != true) {
+      _hasCompass = true;
+      if (_puckOn) unawaited(_enablePuck());
+    }
+  }
+
+  void _dismissHint() {
+    setState(() => _showCalibrateHint = false);
+    _hintUsed = true;
+    unawaited(_prefs.setBool(compassHintDismissedKey, true).catchError((Object _) {}));
+  }
+
   double get _sheetInset => widget.sheetInset + 6;
+
+  // The Mapbox logo and (i) sit just above the closed sheet. iOS measures their margin from
+  // the safe area, which already leaves out the home indicator.
+  double get _ornamentMargin => widget.sheetInset - (Platform.isIOS ? MediaQuery.paddingOf(context).bottom : 0) + 6;
 
   @override
   void didUpdateWidget(_LiveMap old) {
     super.didUpdateWidget(old);
     final map = _map;
     if (map != null && old.sheetInset != widget.sheetInset) {
-      unawaited(map.logo.updateSettings(LogoSettings(marginBottom: _sheetInset)));
-      unawaited(map.attribution.updateSettings(AttributionSettings(marginBottom: _sheetInset)));
+      unawaited(map.logo.updateSettings(LogoSettings(marginBottom: _ornamentMargin)));
+      unawaited(map.attribution.updateSettings(AttributionSettings(marginBottom: _ornamentMargin)));
     }
   }
 
@@ -234,8 +306,8 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     // Our own controls replace the built-in compass and scale bar
     await map.compass.updateSettings(CompassSettings(enabled: false));
     await map.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
-    await map.logo.updateSettings(LogoSettings(marginBottom: _sheetInset));
-    await map.attribution.updateSettings(AttributionSettings(marginBottom: _sheetInset));
+    await map.logo.updateSettings(LogoSettings(marginBottom: _ornamentMargin));
+    await map.attribution.updateSettings(AttributionSettings(marginBottom: _ornamentMargin));
     await _applyView(s, animate: false);
     await _showPuckIfAllowed();
   }
@@ -252,6 +324,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
         );
       }
       await _applyTerrain(ref.read(mapSettingsProvider));
+      final layers = _layers ??= TerrainLayers(map);
+      await layers.install(ref.read(mapSettingsProvider));
+      _scheduleSettled();
       if (!await map.styleLayerExists('sky')) {
         await map.addStyleLayer(
           jsonEncode({
@@ -289,7 +364,23 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     if (await map.styleSourceExists(terrainSourceId)) await _applyTerrain(s);
   }
 
+  // The map's own "idle" event does not reach Flutter on iOS (mapbox_maps_flutter 3.33), so
+  // "settled" is 400 ms without a camera change
+  Timer? _settle;
+
+  void _scheduleSettled() {
+    _settle?.cancel();
+    _settle = Timer(const Duration(milliseconds: 400), _onSettled);
+  }
+
+  void _onSettled() {
+    if (!mounted) return;
+    unawaited(_updateElevation());
+    _layers?.onMapIdle(ref.read(mapSettingsProvider));
+  }
+
   void _onCameraChanged(CameraChangedEventData e) {
+    _scheduleSettled();
     // Throttled like the web (at most every 100 ms); elevation waits for the map to settle
     final now = DateTime.now();
     if (now.difference(_lastTelemetry).inMilliseconds < 100) return;
@@ -341,21 +432,48 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     var permission = await geo.Geolocator.checkPermission();
     if (permission == geo.LocationPermission.denied && ask) permission = await geo.Geolocator.requestPermission();
     if (permission == geo.LocationPermission.deniedForever && ask) {
-      _show('Location is off for Landscape 360. Allow it in Settings.');
+      _show('Location is off for Landscape 360 app. Allow it in Settings.');
     }
     return permission == geo.LocationPermission.whileInUse || permission == geo.LocationPermission.always;
   }
 
-  Future<void> _enablePuck() => _map!.location.updateSettings(
-    LocationComponentSettings(
-      enabled: true,
-      showAccuracyRing: true,
-      pulsingEnabled: false,
-      // The arrow follows the top edge of the phone (compass), like the web's needle
-      puckBearingEnabled: true,
-      puckBearing: PuckBearing.HEADING,
-    ),
-  );
+  bool _puckOn = false;
+  LocationPuck? _puck;
+
+  Future<LocationPuck> _webStylePuck() async {
+    final scale = MediaQuery.devicePixelRatioOf(context);
+    return _puck ??= LocationPuck(
+      locationPuck2D: LocationPuck2D(
+        topImage: await puckDot(scale),
+        bearingImage: await puckBeam(scale),
+        shadowImage: await puckRing(scale),
+        // Drawn at the screen's scale; the map already shows them at that density, so no
+        // scale expression (one made them a third of the size on iPhone)
+      ),
+    );
+  }
+
+  Future<void> _enablePuck() async {
+    final map = _map;
+    if (map == null) return;
+    final puck = await _webStylePuck();
+    _puckOn = true;
+    await map.location.updateSettings(
+      LocationComponentSettings(
+        enabled: true,
+        locationPuck: puck,
+        showAccuracyRing: true,
+        accuracyRingColor: 0x1AE46C24,
+        accuracyRingBorderColor: 0x40E46C24,
+        pulsingEnabled: true,
+        pulsingColor: 0xFFE46C24,
+        // The beam follows the top edge of the phone (compass); without a compass, the
+        // direction of travel from the GPS, like the web
+        puckBearingEnabled: true,
+        puckBearing: _hasCompass == false ? PuckBearing.COURSE : PuckBearing.HEADING,
+      ),
+    );
+  }
 
   Future<void> _showPuckIfAllowed() async {
     if (await _locationAllowed(ask: false)) await _enablePuck();
@@ -414,6 +532,17 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (prev.style != next.style) unawaited(map.loadStyleURI(next.style.uri));
       if (prev.view != next.view) unawaited(_applyView(next));
       if (prev.exaggeration != next.exaggeration && next.is3D) unawaited(_applyTerrain(next));
+      final layers = _layers;
+      if (layers != null &&
+          (prev.showContours != next.showContours ||
+              prev.contourInterval != next.contourInterval ||
+              prev.contourOpacity != next.contourOpacity ||
+              prev.showGrid != next.showGrid ||
+              prev.gridOpacity != next.gridOpacity ||
+              prev.gridStep != next.gridStep ||
+              prev.appliedExaggeration != next.appliedExaggeration)) {
+        unawaited(layers.apply(next).then((_) => layers.refresh(next)));
+      }
     });
 
     final top = MediaQuery.paddingOf(context).top + 8;
@@ -426,7 +555,6 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
           onMapCreated: _onMapCreated,
           onStyleLoadedListener: _onStyleLoaded,
           onCameraChangeListener: _onCameraChanged,
-          onMapIdleListener: (_) => unawaited(_updateElevation()),
         ),
         // Keeps the status bar readable over satellite imagery
         if (satellite)
@@ -492,6 +620,13 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
             ],
           ),
         ),
+        if (_showCalibrateHint)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: _sheetInset + 12,
+            child: Center(child: _CalibrateHint(onDismiss: _dismissHint)),
+          ),
         Positioned(
           left: 16,
           right: 16,
@@ -521,6 +656,38 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       ],
     );
   }
+}
+
+/// Small one-time hint while the compass looks off (same text as the web)
+class _CalibrateHint extends StatelessWidget {
+  const _CalibrateHint({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) => GlassPanel(
+    key: const Key('calibrate-hint'),
+    radius: 20,
+    padding: const EdgeInsets.only(left: 12),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.explore_outlined, size: 16, color: L360Colors.ember600),
+        const SizedBox(width: 6),
+        const Text(
+          'Compass off: move the phone in a figure 8',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: L360Colors.sand700),
+        ),
+        IconButton(
+          tooltip: "Don't show this hint again",
+          visualDensity: VisualDensity.compact,
+          iconSize: 16,
+          icon: const Icon(Icons.close, color: L360Colors.sand500),
+          onPressed: onDismiss,
+        ),
+      ],
+    ),
+  );
 }
 
 class _ZoomButton extends StatelessWidget {

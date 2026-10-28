@@ -2,23 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
 import '../../domain/account/profile.dart';
+import '../../domain/map/grid_dms.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/share/share_location.dart';
+import '../../domain/terrain/contours.dart';
 import '../guide/quick_guide.dart';
 import 'map_settings_controller.dart';
-
-/// Same text as APP_SHARE_TEXT in src/components/AppShareButton.tsx (web)
-const appShareText =
-    'Landscape 360 · Explore without Limits\n'
-    'Peta 3D & kontur, offline maps, GPS tracking dan S.O.S untuk penggiat alam terbuka.\n'
-    '$siteUrl/';
 
 /// Height of the sheet's always-visible part (grabber, header, section tabs) until it has
 /// been measured, without the bottom safe area
@@ -26,7 +21,7 @@ const mapSheetPeekHeight = 140.0;
 
 enum _Section { tools, map, terrain }
 
-/// Bottom sheet like the mobile web: header (Guide, Share, account), Tools / Map / Terrain
+/// Bottom sheet like the mobile web: header (Guide, account), Tools / Map / Terrain
 /// sections and the footer links
 class MapSheet extends ConsumerStatefulWidget {
   const MapSheet({
@@ -189,15 +184,7 @@ class _Header extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Landscape 360',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: L360Colors.forest800,
-                  ),
-                ),
+                BrandName(),
                 Text('Explore without Limits', style: TextStyle(fontSize: 12, color: L360Colors.sand500)),
               ],
             ),
@@ -207,23 +194,6 @@ class _Header extends ConsumerWidget {
             tooltip: 'Quick Guide',
             icon: const Icon(Icons.help_outline),
             onPressed: () => showQuickGuide(context),
-          ),
-          Builder(
-            builder: (btnContext) => IconButton(
-              key: const Key('share-app'),
-              tooltip: 'Share Landscape 360',
-              icon: const Icon(Icons.ios_share),
-              onPressed: () {
-                final box = btnContext.findRenderObject() as RenderBox?;
-                SharePlus.instance.share(
-                  ShareParams(
-                    text: appShareText,
-                    subject: 'Landscape 360',
-                    sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
-                  ),
-                );
-              },
-            ),
           ),
           _AccountButton(profile: profile),
         ],
@@ -582,13 +552,15 @@ class _TerrainSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(mapSettingsProvider);
     final c = ref.read(mapSettingsProvider.notifier);
+    // Like the web: contour and height controls work in 3D; the grid works in both views
+    final terrainOn = s.is3D;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!s.is3D) ...[
-          // Like the web's terrain hint: terrain controls work in the 3D view
+        if (!terrainOn) ...[
           Container(
-            padding: const EdgeInsets.all(12),
+            key: const Key('terrain-hint'),
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
             decoration: BoxDecoration(
               color: L360Colors.gold50,
               borderRadius: BorderRadius.circular(L360.radiusSmall),
@@ -600,50 +572,252 @@ class _TerrainSection extends ConsumerWidget {
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    'Terrain works in 3D. Switch Map View to 3D Terrain.',
-                    style: TextStyle(fontSize: 13, color: L360Colors.gold700),
+                    'Contours work in 3D. Switch Map View to 3D Terrain to use them. The grid works in both.',
+                    style: TextStyle(fontSize: 13, height: 1.35, color: L360Colors.gold700),
                   ),
                 ),
-                TextButton(onPressed: () => c.setView(MapView.threeD), child: const Text('Switch')),
+                TextButton(onPressed: () => c.setView(MapView.threeD), child: const Text('3D Terrain')),
               ],
             ),
           ),
           const SizedBox(height: 16),
         ],
-        SectionLabel(
-          'Exaggeration (Height)',
-          trailing: Text(
-            '${s.exaggeration.toStringAsFixed(1)}×',
-            style: const TextStyle(fontWeight: FontWeight.w700, color: L360Colors.forest800),
-          ),
-        ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-            child: Row(
-              children: [
-                const Text('1×', style: TextStyle(fontSize: 12, color: L360Colors.sand500)),
-                Expanded(
-                  child: Slider(
-                    key: const Key('exaggeration'),
-                    value: s.exaggeration,
-                    min: minExaggeration,
-                    max: maxExaggeration,
-                    divisions: 20,
-                    onChanged: (v) {
-                      if (v != s.exaggeration) HapticFeedback.selectionClick();
-                      c.setExaggeration(v);
-                    },
-                  ),
-                ),
-                const Text('3×', style: TextStyle(fontSize: 12, color: L360Colors.sand500)),
-              ],
+        const SectionLabel('Contours Config'),
+        _ControlCard(
+          enabled: terrainOn,
+          children: [
+            _SwitchRow(
+              key: const Key('contours-toggle'),
+              label: 'Contours',
+              value: s.showContours,
+              onChanged: terrainOn ? c.setShowContours : null,
             ),
-          ),
+            _SliderRow(
+              label: 'Opacity Contours',
+              valueLabel: '${(s.contourOpacity * 100).round()}%',
+              value: s.contourOpacity,
+              min: 0,
+              max: 1,
+              divisions: 100,
+              onChanged: terrainOn && s.showContours ? c.setContourOpacity : null,
+            ),
+            _SliderRow(
+              key: const Key('contour-interval'),
+              label: 'Contour Interval',
+              valueLabel: '${_trim(s.contourInterval)}m',
+              value: s.contourInterval,
+              min: minContourInterval,
+              max: maxContourInterval,
+              divisions: ((maxContourInterval - minContourInterval) / contourIntervalStep).round(),
+              onChanged: terrainOn && s.showContours ? c.setContourInterval : null,
+            ),
+            _ChoiceRow<double>(
+              options: [for (final v in contourIntervalPresets) (v, '${_trim(v)}m')],
+              selected: s.contourInterval,
+              onSelected: terrainOn && s.showContours ? c.setContourInterval : null,
+            ),
+            _SliderRow(
+              key: const Key('exaggeration'),
+              label: 'Exaggeration (Height)',
+              valueLabel: '${s.exaggeration.toStringAsFixed(1)}x',
+              value: s.exaggeration,
+              min: minExaggeration,
+              max: maxExaggeration,
+              divisions: ((maxExaggeration - minExaggeration) * 10).round(),
+              onChanged: terrainOn ? c.setExaggeration : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const SectionLabel('Grid Config'),
+        _ControlCard(
+          children: [
+            _SwitchRow(key: const Key('grid-toggle'), label: 'Grid DMS', value: s.showGrid, onChanged: c.setShowGrid),
+            if (s.showGrid) ...[
+              _SliderRow(
+                label: 'Grid Opacity',
+                valueLabel: '${(s.gridOpacity * 100).round()}%',
+                value: s.gridOpacity,
+                min: 0,
+                max: 1,
+                divisions: 20,
+                onChanged: c.setGridOpacity,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                child: Text('Grid Interval', style: Theme.of(context).textTheme.bodyMedium),
+              ),
+              _ChoiceRow<double?>(
+                options: [for (final (step, label, _) in gridStepOptions) (step, label)],
+                selected: s.gridStep,
+                onSelected: c.setGridStep,
+              ),
+            ],
+          ],
         ),
       ],
     );
   }
+}
+
+String _trim(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+/// White card holding a group of controls; dimmed when the group does not apply
+class _ControlCard extends StatelessWidget {
+  const _ControlCard({required this.children, this.enabled = true});
+
+  final List<Widget> children;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: enabled ? 1 : 0.5,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      ),
+    ),
+  );
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({super.key, required this.label, required this.value, required this.onChanged});
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  void _toggle() {
+    HapticFeedback.selectionClick();
+    onChanged!(!value);
+  }
+
+  // The whole row toggles, not only the switch
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onChanged == null ? null : _toggle,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 8, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeTrackColor: L360Colors.forest700,
+            onChanged: onChanged == null ? null : (_) => _toggle(),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _SliderRow extends StatelessWidget {
+  const _SliderRow({
+    super.key,
+    required this.label,
+    required this.valueLabel,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String valueLabel;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final ValueChanged<double>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
+            Text(
+              valueLabel,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: L360Colors.forest800,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context)
+              .copyWith(overlayShape: SliderComponentShape.noOverlay, tickMarkShape: SliderTickMarkShape.noTickMark),
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged == null
+                ? null
+                : (v) {
+                    if (v != value) HapticFeedback.selectionClick();
+                    onChanged!(v);
+                  },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ChoiceRow<T> extends StatelessWidget {
+  const _ChoiceRow({required this.options, required this.selected, required this.onSelected});
+
+  final List<(T, String)> options;
+  final T selected;
+  final ValueChanged<T>? onSelected;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 6, 14, 8),
+    child: Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final (value, label) in options)
+          GestureDetector(
+            onTap: onSelected == null
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    onSelected!(value);
+                  },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: value == selected ? L360Colors.forest800 : L360Colors.sand50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: value == selected ? L360Colors.forest600 : L360Colors.sand200),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: value == selected ? FontWeight.w700 : FontWeight.w500,
+                  color: value == selected ? Colors.white : L360Colors.sand600,
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 // --- Footer ----------------------------------------------------------------------------------

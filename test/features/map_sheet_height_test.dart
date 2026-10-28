@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:landscape360/core/config/app_config.dart';
 import 'package:landscape360/core/providers.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
+import 'package:landscape360/core/ui/widgets.dart';
 import 'package:landscape360/features/map/map_screen.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -74,7 +75,7 @@ void main() {
     await tester.tap(find.byKey(const Key('sheet-grabber')));
     await tester.pumpAndSettle();
     expect(bodyOpacity(), 0);
-    await tester.fling(find.text('Landscape 360'), const Offset(0, -300), 1500);
+    await tester.fling(find.byType(BrandName), const Offset(0, -300), 1500);
     await tester.pumpAndSettle();
     expect(bodyOpacity(), 1);
     expect(gapBelowFooter(), lessThan(40)); // credits sit just above the home indicator

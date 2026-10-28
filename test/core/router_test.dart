@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +8,7 @@ import 'package:landscape360/core/providers.dart';
 import 'package:landscape360/core/router.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/domain/account/profile.dart';
+import 'package:landscape360/features/account/account_screen.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -66,5 +69,74 @@ void main() {
     expect(find.text('Budi'), findsOneWidget);
     expect(find.text('Pro'), findsOneWidget);
     expect(find.text('Open the admin panel on the web'), findsNothing);
+  });
+
+  testWidgets('signing out on the account page goes back to the map, never a blank page', (tester) async {
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+    final auth = StreamController<String?>();
+    addTearDown(auth.close);
+    var signedIn = true;
+    final router = buildRouter(isSignedIn: () => signedIn)..go('/account');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(
+            const AppConfig(
+              flavor: 'dev',
+              supabaseUrl: 'https://x.supabase.co',
+              supabaseAnonKey: 'sb_publishable_x',
+              mapboxPublicToken: '',
+              apiBaseUrl: 'https://landscape360.jcdigital.co.id',
+            ),
+          ),
+          authUserIdProvider.overrideWith((ref) => auth.stream),
+          profileProvider.overrideWith((ref) async {
+            final id = ref.watch(authUserIdProvider).value;
+            return id == null
+                ? null
+                : const AccountProfile(
+                    userId: 'u1',
+                    email: 'budi@example.com',
+                    displayName: 'Budi',
+                    plan: Plan.pro,
+                    role: UserRole.pengguna360,
+                    isAdmin: false,
+                    canUseSos: false,
+                  );
+          }),
+        ],
+        child: MaterialApp.router(theme: buildAppTheme(), routerConfig: router),
+      ),
+    );
+    auth.add('u1');
+    await tester.pumpAndSettle();
+    expect(find.text('Budi'), findsOneWidget);
+
+    signedIn = false;
+    auth.add(null);
+    await tester.pumpAndSettle();
+    expect(find.text('User Account'), findsNothing);
+    expect(find.textContaining('MAPBOX_PUBLIC_TOKEN'), findsOneWidget); // the map screen
+  });
+
+  testWidgets('the account page without a session shows a signed-out view with a way out', (tester) async {
+    await pump(tester, signedIn: true, start: '/account');
+    // profile resolves to Budi here; check the signed-out view on its own
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: ProviderScope(
+          overrides: [
+            authUserIdProvider.overrideWith((ref) => Stream.value(null)),
+            profileProvider.overrideWith((ref) async => null),
+          ],
+          child: const AccountScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('signed-out')), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Back to the map'), findsOneWidget);
   });
 }

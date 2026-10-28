@@ -17,6 +17,10 @@ class AccountScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Signed out (here, on another device, or the session ended): back to the map
+    ref.listen(authUserIdProvider, (prev, next) {
+      if (prev?.value != null && next.hasValue && next.value == null && context.mounted) context.go('/');
+    });
     final profile = ref.watch(profileProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('User Account')),
@@ -24,10 +28,43 @@ class AccountScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
             Padding(padding: const EdgeInsets.all(L360.gutter), child: ErrorBanner('Could not load your account: $e')),
-        data: (p) => p == null ? const Center(child: Text('Signed out')) : _AccountBody(profile: p),
+        data: (p) => p == null ? const _SignedOut() : _AccountBody(profile: p),
       ),
     );
   }
+}
+
+/// Shown for a moment after signing out, or if the account page is reached without a session
+class _SignedOut extends StatelessWidget {
+  const _SignedOut();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    key: const Key('signed-out'),
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('assets/images/logo.png', width: 80, height: 80),
+          const SizedBox(height: 12),
+          const BrandName(textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          Text("You're signed out", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          const Text(
+            'The map still works. Sign in to use your account.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: L360Colors.sand600),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(onPressed: () => context.go('/login'), child: const Text('Sign in')),
+          const SizedBox(height: 10),
+          OutlinedButton(onPressed: () => context.go('/'), child: const Text('Back to the map')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _AccountBody extends ConsumerWidget {
@@ -51,9 +88,11 @@ class _AccountBody extends ConsumerWidget {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !context.mounted) return;
+    // Taken before signing out: this page is replaced as soon as the session ends
+    final router = GoRouter.of(context);
     await ref.read(accountRepositoryProvider).signOut();
-    if (context.mounted) context.go('/');
+    router.go('/');
   }
 
   @override

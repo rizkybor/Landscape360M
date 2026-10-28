@@ -54,3 +54,20 @@ Status 28 Oktober 2026: Fase 1 dan Fase 3 lulus di iPhone 13 (iOS 26.7) dengan a
 | 4a.12 | Biarkan peta 3D diam 15 menit | HP tidak panas, baterai wajar | | |
 | 4a.13 | Tombol Share di sheet | Lembar share iOS/Android dengan teks + link Landscape 360 | | |
 | 4a.14 | Link footer (Docs, Privacy, …) | Terbuka di browser | | |
+
+## Fase 4b — Kompas, kontur, grid DMS
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 4b.1 | Tombol lokasi, lalu putar HP mendatar perlahan | Titik oranye dengan sorot 70° dan jarum mengikuti arah atas HP, halus, tanpa bergetar | | |
+| 4b.2 | Putar peta dengan dua jari | Sorot tetap menunjuk arah yang benar di dunia nyata (bukan ikut layar) | | |
+| 4b.3 | Dekat magnet / speaker, gerakkan HP acak | Muncul "Compass off: move the phone in a figure 8"; hilang sendiri setelah kompas normal | | |
+| 4b.4 | Tutup petunjuk dengan X, tutup paksa aplikasi, ulangi 4b.3 | Petunjuk tidak muncul lagi | | |
+| 4b.5 | Zoom ≥ 11 di daerah gunung | Garis kontur kuning; tiap garis indeks (4× interval) lebih tebal; label "2400m" di zoom ≥ 14 | | |
+| 4b.6 | Terrain → interval 12.5 / 25 / 50 / 125 m (di 3D) | Kerapatan kontur berubah; label indeks 50 / 100 / 200 / 500 m | | |
+| 4b.7 | Opacity Contours ke 20% | Kontur dan label memudar | | |
+| 4b.8 | Zoom < 11 | Kontur hilang | | |
+| 4b.9 | Grid DMS on, Auto, zoom in/out | Garis biru putus-putus, label DMS; jarak grid 5' → 1' → 30" → 15" sesuai zoom | | |
+| 4b.10 | Grid interval 30" | Grid tetap 30" walau zoom berubah | | |
+| 4b.11 | Geser peta, berhenti | Elev, kontur dan grid diperbarui ±0,5 detik setelah peta berhenti | | |
+| 4b.12 | Mode 2D | Kontrol kontur & exaggeration redup dengan petunjuk "Contours work in 3D…"; grid tetap bisa diatur | | |
