@@ -19,29 +19,152 @@ import 'telemetry_card.dart';
 /// Home screen: the Mapbox map (2D / 3D terrain), the user's location, the telemetry of the
 /// point under the crosshair and the Tools / Map / Terrain sheet. Like the web, it works
 /// without signing in.
-class MapScreen extends ConsumerWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends ConsumerState<MapScreen> {
+  final _sheet = DraggableScrollableController();
+  double? _contentHeight;
+  double _headerHeight = mapSheetPeekHeight;
+  double _bodyVisibility = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheet.addListener(_onSheetMoved);
+  }
+
+  @override
+  void dispose() {
+    _sheet
+      ..removeListener(_onSheetMoved)
+      ..dispose();
+    super.dispose();
+  }
+
+  /// Closed, the sheet shows exactly its header (grabber, title row, section tabs) above the
+  /// home indicator
+  double _peek(BuildContext context) =>
+      ((_headerHeight + MediaQuery.paddingOf(context).bottom) / MediaQuery.sizeOf(context).height).clamp(0.08, 0.4);
+
+  /// Highest the sheet may open: as tall as its content, at most 90% of the screen
+  double _maxSize(double screen, double peek) {
+    final content = _contentHeight;
+    if (content == null) return peek;
+    return (content / screen).clamp(peek, 0.9);
+  }
+
+  void _onSheetMoved() {
+    if (!_sheet.isAttached || !mounted) return;
+    // The content below the tabs fades in over the first few percent of opening
+    final v = ((_sheet.size - _peek(context)) / 0.05).clamp(0.0, 1.0);
+    if ((v - _bodyVisibility).abs() > 0.01 || (v != _bodyVisibility && (v == 0 || v == 1))) {
+      setState(() => _bodyVisibility = v);
+    }
+  }
+
+  void _onHeaderHeight(double height) {
+    if (!mounted || (height - _headerHeight).abs() < 0.5) return;
+    final wasClosed = !_sheet.isAttached || _bodyVisibility == 0;
+    setState(() => _headerHeight = height);
+    if (wasClosed && _sheet.isAttached) _sheet.jumpTo(_peek(context));
+  }
+
+  void _onContentHeight(double height) {
+    if (!mounted || height == _contentHeight) return;
+    setState(() => _contentHeight = height);
+    // A shorter section while the sheet is open: settle on the new top instead of leaving a gap
+    final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
+    if (_sheet.isAttached && _sheet.size > max + 0.001) {
+      _sheet.animateTo(max, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    }
+  }
+
+  /// Tapping a section tab while the sheet is closed opens it, so the section shows
+  void _onSectionChanged() {
+    if (!_sheet.isAttached || _bodyVisibility > 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheet.isAttached) return;
+      final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
+      _sheet.animateTo(max, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+    });
+  }
+
+  List<double> _snaps(double peek, double max) => {peek, if (max > 0.6) 0.5, max}.toList()..sort();
+
+  /// Header dragged: the sheet follows the finger
+  void _onHandleDrag(double dy) {
+    if (!_sheet.isAttached) return;
+    final screen = MediaQuery.sizeOf(context).height;
+    final peek = _peek(context);
+    _sheet.jumpTo((_sheet.size - dy / screen).clamp(peek, _maxSize(screen, peek)));
+  }
+
+  /// Header released: a flick goes to the next stop that way, otherwise to the nearest
+  void _onHandleDragEnd(double velocity) {
+    if (!_sheet.isAttached) return;
+    final screen = MediaQuery.sizeOf(context).height;
+    final peek = _peek(context);
+    final snaps = _snaps(peek, _maxSize(screen, peek));
+    final size = _sheet.size;
+    double target;
+    if (velocity < -300) {
+      target = snaps.firstWhere((s) => s > size + 0.01, orElse: () => snaps.last);
+    } else if (velocity > 300) {
+      target = snaps.lastWhere((s) => s < size - 0.01, orElse: () => snaps.first);
+    } else {
+      target = snaps.reduce((a, b) => (a - size).abs() <= (b - size).abs() ? a : b);
+    }
+    _sheet.animateTo(target, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+  }
+
+  /// Grabber tapped: open when closed, close when open
+  void _onGrabberTap() {
+    if (!_sheet.isAttached) return;
+    final screen = MediaQuery.sizeOf(context).height;
+    final peek = _peek(context);
+    final target = _bodyVisibility > 0 ? peek : _maxSize(screen, peek);
+    _sheet.animateTo(target, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final hasToken = ref.watch(appConfigProvider).mapboxPublicToken.isNotEmpty;
-    final height = MediaQuery.sizeOf(context).height;
-    final peek = ((mapSheetPeekHeight + MediaQuery.paddingOf(context).bottom) / height).clamp(0.1, 0.4);
+    final screen = MediaQuery.sizeOf(context).height;
+    final peek = _peek(context);
+    final max = _maxSize(screen, peek);
+    // Middle stop only when the content is tall enough for it to mean something
+    final snaps = _snaps(peek, max);
     // Light status bar over satellite imagery, dark over the light Streets / Outdoors maps
     final dark = ref.watch(mapSettingsProvider.select((s) => s.style == MapStyle.satellite));
+    final sheetInset = _headerHeight + MediaQuery.paddingOf(context).bottom;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         body: Stack(
           children: [
-            Positioned.fill(child: hasToken ? const _LiveMap() : const _NoMapToken()),
+            Positioned.fill(child: hasToken ? _LiveMap(sheetInset: sheetInset) : const _NoMapToken()),
             DraggableScrollableSheet(
+              controller: _sheet,
               initialChildSize: peek,
               minChildSize: peek,
-              maxChildSize: 0.9,
+              maxChildSize: max,
               snap: true,
-              snapSizes: [peek, 0.5],
-              builder: (context, controller) => MapSheet(scrollController: controller),
+              snapSizes: snaps,
+              builder: (context, controller) => MapSheet(
+                scrollController: controller,
+                onContentHeight: _onContentHeight,
+                onHeaderHeight: _onHeaderHeight,
+                onSectionChanged: _onSectionChanged,
+                onHandleDrag: _onHandleDrag,
+                onHandleDragEnd: _onHandleDragEnd,
+                onGrabberTap: _onGrabberTap,
+                bodyVisibility: _bodyVisibility,
+              ),
             ),
           ],
         ),
@@ -66,7 +189,10 @@ class _NoMapToken extends StatelessWidget {
 }
 
 class _LiveMap extends ConsumerStatefulWidget {
-  const _LiveMap();
+  const _LiveMap({required this.sheetInset});
+
+  /// Height of the closed sheet, kept clear for the Mapbox logo, attribution and messages
+  final double sheetInset;
 
   @override
   ConsumerState<_LiveMap> createState() => _LiveMapState();
@@ -81,8 +207,17 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   bool _telemetryOpen = false;
 
-  // Height of the collapsed sheet: keeps the Mapbox logo and attribution visible above it
-  double get _sheetInset => mapSheetPeekHeight + MediaQuery.paddingOf(context).bottom + 6;
+  double get _sheetInset => widget.sheetInset + 6;
+
+  @override
+  void didUpdateWidget(_LiveMap old) {
+    super.didUpdateWidget(old);
+    final map = _map;
+    if (map != null && old.sheetInset != widget.sheetInset) {
+      unawaited(map.logo.updateSettings(LogoSettings(marginBottom: _sheetInset)));
+      unawaited(map.attribution.updateSettings(AttributionSettings(marginBottom: _sheetInset)));
+    }
+  }
 
   Future<void> _onMapCreated(MapboxMap map) async {
     _map = map;

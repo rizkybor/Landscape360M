@@ -104,6 +104,24 @@ void main() {
       expect(container.read(mapSettingsProvider).exaggeration, maxExaggeration);
     });
 
+    testWidgets('tool tiles are equal squares and the shorter last row is centered', (tester) async {
+      await pump(tester);
+      final names = ['Navigator', 'Route', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps'];
+      final rects = [for (final n in names) tester.getRect(find.byKey(Key('tool-$n')))];
+      for (final r in rects) {
+        expect(r.width, rects.first.width);
+        expect(r.height, r.width);
+      }
+      // Even gaps in the first row
+      for (var i = 1; i < 4; i++) {
+        expect(rects[i].left - rects[i - 1].right, closeTo(10, 0.01));
+      }
+      // Second row centered under the first: same space left and right
+      final rowLeft = rects[0].left, rowRight = rects[3].right;
+      expect(rects[4].left - rowLeft, closeTo(rowRight - rects[6].right, 0.5));
+      expect(rects[4].top - rects[0].bottom, closeTo(10, 0.01));
+    });
+
     testWidgets('header offers guide, sharing and signing in; tools not built yet say so', (tester) async {
       await pump(tester);
       expect(find.byKey(const Key('share-app')), findsOneWidget);

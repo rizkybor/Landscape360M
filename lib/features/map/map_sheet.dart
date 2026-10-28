@@ -20,18 +20,48 @@ const appShareText =
     'Peta 3D & kontur, offline maps, GPS tracking dan S.O.S untuk penggiat alam terbuka.\n'
     '$siteUrl/';
 
-/// Height of the sheet's always-visible part (grabber, header, section tabs), without the
-/// bottom safe area
-const mapSheetPeekHeight = 150.0;
+/// Height of the sheet's always-visible part (grabber, header, section tabs) until it has
+/// been measured, without the bottom safe area
+const mapSheetPeekHeight = 140.0;
 
 enum _Section { tools, map, terrain }
 
 /// Bottom sheet like the mobile web: header (Guide, Share, account), Tools / Map / Terrain
 /// sections and the footer links
 class MapSheet extends ConsumerStatefulWidget {
-  const MapSheet({super.key, required this.scrollController});
+  const MapSheet({
+    super.key,
+    required this.scrollController,
+    this.onContentHeight,
+    this.onHeaderHeight,
+    this.bodyVisibility = 1,
+    this.onSectionChanged,
+    this.onHandleDrag,
+    this.onHandleDragEnd,
+    this.onGrabberTap,
+  });
 
   final ScrollController scrollController;
+
+  /// Height of the part that stays visible when the sheet is closed (grabber, header, tabs)
+  final ValueChanged<double>? onHeaderHeight;
+
+  /// 0 while the sheet is closed (only the header shows), 1 once it is opened
+  final double bodyVisibility;
+
+  /// A section tab was tapped (the map opens the sheet to show it)
+  final VoidCallback? onSectionChanged;
+
+  /// The header works as the sheet's handle: dragged by [onHandleDrag] (pixels, down is
+  /// positive), released with [onHandleDragEnd] (velocity in px/s), tapped on the grabber
+  /// with [onGrabberTap]
+  final ValueChanged<double>? onHandleDrag;
+  final ValueChanged<double>? onHandleDragEnd;
+  final VoidCallback? onGrabberTap;
+
+  /// Height of everything in the sheet; the map limits how far the sheet opens to it, so
+  /// it never shows empty space below short sections
+  final ValueChanged<double>? onContentHeight;
 
   @override
   ConsumerState<MapSheet> createState() => _MapSheetState();
@@ -50,36 +80,79 @@ class _MapSheetState extends ConsumerState<MapSheet> {
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: CustomScrollView(
+        child: SingleChildScrollView(
           controller: widget.scrollController,
-          slivers: [
-            const SliverToBoxAdapter(child: _Grabber()),
-            const SliverToBoxAdapter(child: _Header()),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: _SectionTabs(value: _section, onChanged: (s) => setState(() => _section = s)),
-              ),
-            ),
-            const SliverToBoxAdapter(child: Divider()),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              sliver: SliverToBoxAdapter(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: KeyedSubtree(
-                    key: ValueKey(_section),
-                    child: switch (_section) {
-                      _Section.tools => const _ToolsSection(),
-                      _Section.map => const _MapSection(),
-                      _Section.terrain => const _TerrainSection(),
-                    },
+          // No bounce past the end: the sheet never shows empty space below its content
+          physics: const ClampingScrollPhysics(),
+          child: MeasureSize(
+            onChange: (size) => widget.onContentHeight?.call(size.height),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MeasureSize(
+                  onChange: (size) => widget.onHeaderHeight?.call(size.height),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onVerticalDragUpdate: widget.onHandleDrag == null ? null : (d) => widget.onHandleDrag!(d.delta.dy),
+                    onVerticalDragEnd: widget.onHandleDragEnd == null
+                        ? null
+                        : (d) => widget.onHandleDragEnd!(d.velocity.pixelsPerSecond.dy),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        GestureDetector(
+                          key: const Key('sheet-grabber'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onGrabberTap,
+                          child: const _Grabber(),
+                        ),
+                        const _Header(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                          child: _SectionTabs(
+                            value: _section,
+                            onChanged: (s) {
+                              setState(() => _section = s);
+                              widget.onSectionChanged?.call();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+                IgnorePointer(
+                  ignoring: widget.bodyVisibility < 0.5,
+                  child: Opacity(
+                    opacity: widget.bodyVisibility,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Divider(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                          child: AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            alignment: Alignment.topCenter,
+                            child: KeyedSubtree(
+                              key: ValueKey(_section),
+                              child: switch (_section) {
+                                _Section.tools => const _ToolsSection(),
+                                _Section.map => const _MapSection(),
+                                _Section.terrain => const _TerrainSection(),
+                              },
+                            ),
+                          ),
+                        ),
+                        const _Footer(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SliverToBoxAdapter(child: _Footer()),
-          ],
+          ),
         ),
       ),
     );
@@ -92,7 +165,7 @@ class _Grabber extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
     child: Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 6),
+      margin: const EdgeInsets.only(top: 10, bottom: 8),
       width: 38,
       height: 5,
       decoration: BoxDecoration(color: L360Colors.sand300, borderRadius: BorderRadius.circular(3)),
@@ -263,16 +336,28 @@ class _ToolsSection extends StatelessWidget {
     (Icons.layers_outlined, 'Basemaps', 7),
   ];
 
+  static const _columns = 4;
+  static const _gap = 10.0;
+
+  // Square tiles of one exact size (a quarter of the width less the gaps); a shorter last
+  // row is centered so the grid has no hole on the right
   @override
-  Widget build(BuildContext context) => GridView.count(
-    crossAxisCount: 4,
-    shrinkWrap: true,
-    padding: EdgeInsets.zero,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: 10,
-    crossAxisSpacing: 10,
-    childAspectRatio: 0.86,
-    children: [for (final (icon, label, phase) in tools) ToolTile(icon: icon, label: label, availableInPhase: phase)],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final side = ((constraints.maxWidth - _gap * (_columns - 1)) / _columns).floorToDouble();
+      return Wrap(
+        alignment: WrapAlignment.center,
+        spacing: _gap,
+        runSpacing: _gap,
+        children: [
+          for (final (icon, label, phase) in tools)
+            SizedBox.square(
+              dimension: side,
+              child: ToolTile(icon: icon, label: label, availableInPhase: phase),
+            ),
+        ],
+      );
+    },
   );
 }
 
@@ -309,26 +394,36 @@ class ToolTile extends StatelessWidget {
       },
       child: Opacity(
         opacity: enabled ? 1 : 0.55,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(color: L360Colors.sand100, borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, size: 20, color: L360Colors.sand700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: L360Colors.sand700),
-            ),
-            if (!enabled)
-              const Text(
-                'Soon',
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: L360Colors.sand500),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: L360Colors.sand100, borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, size: 19, color: L360Colors.sand700),
               ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: L360Colors.sand700,
+                ),
+              ),
+              if (!enabled)
+                const Text(
+                  'Soon',
+                  style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: L360Colors.sand500),
+                ),
+            ],
+          ),
         ),
       ),
     ),
@@ -570,45 +665,44 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) {
     const small = TextStyle(fontSize: 11, color: L360Colors.sand500);
     const strong = TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: L360Colors.sand700);
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 24, 12, 16),
-        child: Column(
-          children: [
-            Wrap(
-              alignment: WrapAlignment.center,
-              children: [
-                for (final (label, path) in _links)
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      foregroundColor: L360Colors.sand600,
-                      textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    onPressed: () => _open('$siteUrl$path'),
-                    child: Text(label),
+    // Just enough room under the credits to clear the home indicator
+    final bottom = (MediaQuery.paddingOf(context).bottom - 16).clamp(10.0, 40.0);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 16, 12, bottom),
+      child: Column(
+        children: [
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              for (final (label, path) in _links)
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: L360Colors.sand600,
+                    textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w500),
                   ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              alignment: WrapAlignment.center,
-              children: [
-                const Text('Powered by ', style: small),
-                GestureDetector(
-                  onTap: () => _open('https://instagram.com/jendelacakradigital'),
-                  child: const Text('Jendela Cakra Digital', style: strong),
+                  onPressed: () => _open('$siteUrl$path'),
+                  child: Text(label),
                 ),
-                const Text(' · ', style: small),
-                GestureDetector(
-                  onTap: () => _open('https://instagram.com/makopala_ubl'),
-                  child: const Text('Makopala Univ. Budi Luhur', style: strong),
-                ),
-              ],
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              const Text('Powered by ', style: small),
+              GestureDetector(
+                onTap: () => _open('https://instagram.com/jendelacakradigital'),
+                child: const Text('Jendela Cakra Digital', style: strong),
+              ),
+              const Text(' · ', style: small),
+              GestureDetector(
+                onTap: () => _open('https://instagram.com/makopala_ubl'),
+                child: const Text('Makopala Univ. Budi Luhur', style: strong),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
@@ -207,4 +208,33 @@ class BusyButton extends StatelessWidget {
         ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
         : Text(label),
   );
+}
+
+/// Reports its child's size after layout (e.g. so a sheet can be as tall as its content)
+class MeasureSize extends SingleChildRenderObjectWidget {
+  const MeasureSize({super.key, required this.onChange, required super.child});
+
+  final ValueChanged<Size> onChange;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderMeasureSize(onChange);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderMeasureSize renderObject) => renderObject.onChange = onChange;
+}
+
+class RenderMeasureSize extends RenderProxyBox {
+  RenderMeasureSize(this.onChange);
+
+  ValueChanged<Size> onChange;
+  Size? _last;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final size = this.size;
+    if (size == _last) return;
+    _last = size;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onChange(size));
+  }
 }
