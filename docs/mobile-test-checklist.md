@@ -90,3 +90,50 @@ Status 28 Oktober 2026: Fase 1 dan Fase 3 lulus di iPhone 13 (iOS 26.7) dengan a
 | 4c.10 | Ganti mode No toll / Walk | Rute dihitung ulang, warna garis berubah (emas / hijau) | | |
 | 4c.11 | Tukar (⇅), Clear, Recalculate | Bekerja sesuai nama; ketukan ketiga memulai rute baru | | |
 | 4c.12 | Tutup panel (X) | Rute dan titik hilang dari peta; ketukan peta tidak lagi menambah titik | | |
+
+## Fase 5 — Navigator Tool
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 5.1 | Tools → Navigator | Sheet turun, panel Navigator muncul; tile Navigator "Active"; Route tertutup bila tadi terbuka | | |
+| 5.2 | Ketuk peta 4×  | Titik + garis lengkung kuning "Survey 1"; label jarak di tengah tiap segmen; getaran ringan | | |
+| 5.3 | Geser sebuah titik | Titik dan garis ikut jari; elevasi diperbarui setelah dilepas | | |
+| 5.4 | Tahan titik ±0,35 dtk lalu geser | Getaran, garis melengkung mengikuti jari; knob handle muncul | | |
+| 5.5 | Ketuk titik, geser knob handle | Kedua knob berlawanan arah; lengkungan berubah | | |
+| 5.6 | Ketuk area kosong peta saat titik terpilih | Pilihan hilang, tidak menambah titik | | |
+| 5.7 | Straight + Angle 90°, ketuk 3 titik membentuk belokan | Belokan tepat 90°, sudut tajam | | |
+| 5.8 | Corners → Sharp corner at every point | Semua titik jadi sudut tajam | | |
+| 5.9 | Ketuk label jarak | Muncul azimuth • slope% dan Total | | |
+| 5.10 | Ikon daftar → Points | DD, DMS, UTM, Elev per titik; Azimuth / Back Azimuth / Horiz Dist / Slope di antara titik; ganti nama, salin, hapus | | |
+| 5.11 | + Sheet | "Survey 2" warna hijau, titik baru masuk ke sheet itu | | |
+| 5.12 | Login, gambar survei | Ikon awan centang; survei muncul di daftar web (User Account → surveys) | | |
+| 5.13 | **Buka survei itu di web** | **Titik, lengkungan, sudut tajam, nama titik identik** | | |
+| 5.14 | **Buat survei di web, buka di app (ikon folder → pilih)** | **Identik; peta terbang ke survei** | | |
+| 5.15 | Mode pesawat, tambah titik, lalu online lagi | Ikon awan-silang, lalu tersinkron setelah online dan ada perubahan berikutnya | | |
+| 5.16 | Akun Free dengan 2 survei, New survey + titik | Pesan "Survey limit reached for "Free plan" (max : 2)." | | |
+| 5.17 | Tutup paksa app, buka lagi | Survei, mode Straight dan sudut tersimpan | | |
+
+## Fase 6 — Track Recorder
+
+Live tracking (GPS Tracking ke monitor) belum ada di aplikasi sampai kanal `tracking-room` di backend dibuat privat (lihat `docs/security.md`).
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 6.1 | Belum login → Tools → Track | Pesan "Sign in to record and view tracks." | | |
+| 6.2 | Akun Free / Pro → Track | Panel dengan gembok "Recording tracks is available for Enterprise accounts. Hubungi Admin…"; ikon folder tetap membuka daftar track | | |
+| 6.3 | Akun Enterprise / admin, izin lokasi belum diberikan → Start Recording | Penjelasan "Allow location to record" muncul **sebelum** pertanyaan izin sistem | | |
+| 6.4 | Start Recording (Online), berjalan 5 menit | Garis oranye di peta, waktu berjalan, Distance / Moving / Avg speed / Gain / Altitude terisi, "GPS locked · ±x m" | | |
+| 6.5 | Kunci layar 10 menit sambil berjalan, buka lagi | Jalur selama layar mati tetap lengkap. iPhone: kapsul lokasi biru di status bar selama di luar app. Android: notifikasi "Recording track" | | |
+| 6.6 | Pindah ke app lain 5 menit, kembali | Sama seperti 6.5 | | |
+| 6.7 | Tutup panel (X) saat merekam | Pill "REC 00:12:34 · 1.20 km" di atas sheet; ketuk → panel terbuka lagi | | |
+| 6.8 | Pause, jalan 50 m, Resume | Jarak tidak bertambah selama pause; garis tidak menyambung melewati jeda | | |
+| 6.9 | Finish → Save Track | Track di daftar (ikon folder) berstatus SYNCED; terlihat di web (Track Recorder → My Tracks) | | |
+| 6.10 | Mode pesawat, rekam (Online), Finish, lalu online lagi | Status "Waiting to sync", lalu SYNCED setelah sinyal kembali | | |
+| 6.11 | Rekam mode Offline, Finish | Status PHONE ONLY; menu ⋯ → Upload to cloud mengirimnya | | |
+| 6.12 | Tutup paksa app saat merekam, buka lagi | Rekaman kembali dalam status Paused dengan titik yang sudah ada; Resume melanjutkan | | |
+| 6.13 | ⋯ → Show on map | Garis cyan, titik start hijau dan finish merah, peta menyesuaikan | | |
+| 6.14 | ⋯ → Export GPX → simpan / kirim | File .gpx terbuka di aplikasi lain (mis. Gaia GPS, Google Earth) | | |
+| 6.15 | ⋯ → Share with an account → email akun lain | "Shared with …"; akun penerima melihatnya di tab Shared (web dan app), bisa Show on map dan Export GPX | | |
+| 6.16 | Penerima → ⋯ → Remove from my list | Track hilang dari Shared | | |
+| 6.17 | ⋯ → Rename, ⋯ → Delete | Nama berubah (juga di web); track terhapus dari HP dan cloud | | |
+| 6.18 | Rekam 30 menit dengan layar mati | Jalur utuh, baterai wajar (catat % turun) | | |

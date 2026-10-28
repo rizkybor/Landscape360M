@@ -13,6 +13,8 @@ import '../../domain/map/map_settings.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/terrain/contours.dart';
 import '../guide/quick_guide.dart';
+import '../navigator/navigator_state.dart';
+import '../tracks/track_recorder_state.dart';
 import 'map_settings_controller.dart';
 import 'map_tools_state.dart';
 import 'search_page.dart';
@@ -347,18 +349,55 @@ class _ToolsSection extends ConsumerWidget {
 
   // Same tools, order and short names as the web's phone layout (ControlPanel.tsx)
   static const tools = [
-    (Icons.straighten, 'Navigator', 5),
+    (Icons.straighten, 'Navigator', null),
     (Icons.alt_route, 'Route', null),
     (Icons.place_outlined, 'POIs', 7),
-    (Icons.directions_walk, 'Track', 6),
+    (Icons.directions_walk, 'Track', null),
     (Icons.pin_drop_outlined, 'Marked', 7),
     (Icons.hexagon_outlined, 'Areas', 7),
     (Icons.layers_outlined, 'Basemaps', 7),
   ];
 
+  // One panel at a time: opening Route, Navigator or Track closes the others (a recording
+  // keeps going with its panel closed)
   static void _toggleRoute(WidgetRef ref) {
     final planner = ref.read(routePlannerProvider.notifier);
-    ref.read(routePlannerProvider).enabled ? planner.disable() : planner.enable();
+    if (ref.read(routePlannerProvider).enabled) {
+      planner.disable();
+    } else {
+      ref.read(navigatorProvider.notifier).close();
+      ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      planner.enable();
+    }
+  }
+
+  static void _toggleNavigator(WidgetRef ref) {
+    final nav = ref.read(navigatorProvider.notifier);
+    if (ref.read(navigatorProvider).enabled) {
+      nav.close();
+    } else {
+      ref.read(routePlannerProvider.notifier).disable();
+      ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      nav.open();
+    }
+  }
+
+  // Any signed-in account opens it (own and shared tracks); recording needs Enterprise
+  static void _toggleTrack(BuildContext context, WidgetRef ref) {
+    if (ref.read(authUserIdProvider).value == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Sign in to record and view tracks.')));
+      return;
+    }
+    final rec = ref.read(trackRecorderProvider.notifier);
+    if (ref.read(trackRecorderProvider).panelOpen) {
+      rec.setPanelOpen(false);
+    } else {
+      ref.read(routePlannerProvider.notifier).disable();
+      ref.read(navigatorProvider.notifier).close();
+      rec.setPanelOpen(true);
+    }
   }
 
   static const _columns = 4;
@@ -382,8 +421,18 @@ class _ToolsSection extends ConsumerWidget {
                 icon: icon,
                 label: label,
                 availableInPhase: phase,
-                active: label == 'Route' && ref.watch(routePlannerProvider.select((s) => s.enabled)),
-                onTap: label == 'Route' ? () => _toggleRoute(ref) : null,
+                active: switch (label) {
+                  'Route' => ref.watch(routePlannerProvider.select((s) => s.enabled)),
+                  'Navigator' => ref.watch(navigatorProvider.select((s) => s.enabled)),
+                  'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
+                  _ => false,
+                },
+                onTap: switch (label) {
+                  'Route' => () => _toggleRoute(ref),
+                  'Navigator' => () => _toggleNavigator(ref),
+                  'Track' => () => _toggleTrack(context, ref),
+                  _ => null,
+                },
               ),
             ),
         ],

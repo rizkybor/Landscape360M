@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -89,6 +90,11 @@ class AccountRepository {
   final String userAgent;
 
   static String _sosKey(String userId) => 'l360-can-use-sos-$userId';
+  static String _accessKey(String userId) => 'l360-access-$userId';
+
+  // Plan, role and admin flag kept from the last successful load (no personal data), so
+  // without signal an Enterprise account still records tracks and is not shown as Free
+  static const _accessFields = ['status_subscribe', 'status_user', 'is_admin'];
 
   /// Signs in, then records the sign-in for the admin's login history (never blocks it)
   Future<void> signIn(String email, String password) async {
@@ -126,14 +132,26 @@ class AccountRepository {
     } on Object {
       row = null;
     }
+    final cachedSos = await prefs.getBool(_sosKey(user.id));
+    if (row != null) {
+      await prefs.setString(_accessKey(user.id), jsonEncode({for (final k in _accessFields) k: row[k]}));
+    } else {
+      // Offline: the last known plan, role and admin flag, with the last known S.O.S permission
+      try {
+        final cached = await prefs.getString(_accessKey(user.id));
+        if (cached != null) row = {...jsonDecode(cached) as Map<String, dynamic>, 'can_use_sos': cachedSos ?? false};
+      } on Object {
+        // Unreadable cache: Free until the server answers
+      }
+    }
     final profile = AccountProfile.resolve(
       userId: user.id,
       email: user.email ?? '',
       displayName: accountDisplayName(user.userMetadata),
       row: row,
-      cachedCanUseSos: await prefs.getBool(_sosKey(user.id)),
+      cachedCanUseSos: cachedSos,
     );
-    if (row != null) await prefs.setBool(_sosKey(user.id), profile.canUseSos);
+    await prefs.setBool(_sosKey(user.id), profile.canUseSos);
     return profile;
   }
 

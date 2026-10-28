@@ -22,16 +22,20 @@ IconData weatherIcon(String description) => switch (weatherKind(description)) {
 
 typedef LatLng = ({double lat, double lng});
 
-/// The user's position if location is already allowed (never asks), else null
+bool _allowed(geo.LocationPermission p) => p == geo.LocationPermission.always || p == geo.LocationPermission.whileInUse;
+
+/// The user's position. Asks for location the first time (the user opened the weather
+/// for their area); null when it is refused or unavailable.
 Future<LatLng?> deviceLocation() async {
   try {
-    final permission = await geo.Geolocator.checkPermission();
-    if (permission != geo.LocationPermission.always && permission != geo.LocationPermission.whileInUse) return null;
+    var permission = await geo.Geolocator.checkPermission();
+    if (permission == geo.LocationPermission.denied) permission = await geo.Geolocator.requestPermission();
+    if (!_allowed(permission)) return null;
     final p =
         await geo.Geolocator.getLastKnownPosition() ??
         await geo.Geolocator.getCurrentPosition(
           locationSettings: const geo.LocationSettings(
-            accuracy: geo.LocationAccuracy.low,
+            accuracy: geo.LocationAccuracy.medium,
             timeLimit: Duration(seconds: 8),
           ),
         );
@@ -120,6 +124,22 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// "Use my location" after location was refused: ask again, or open Settings when the
+  /// phone no longer asks
+  Future<void> _useMyLocation() async {
+    try {
+      final p = await geo.Geolocator.checkPermission();
+      if (p == geo.LocationPermission.deniedForever) {
+        await geo.Geolocator.openAppSettings();
+        return;
+      }
+      await geo.Geolocator.requestPermission();
+    } on Object {
+      // Location not available on this device
+    }
+    await _load();
   }
 
   void _toggleSize() {
@@ -221,6 +241,17 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                 ),
               )
             else if (r != null) ...[
+              if (_source == 'Map centre')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                  child: TextButton.icon(
+                    key: const Key('weather-use-location'),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    onPressed: _useMyLocation,
+                    icon: const Icon(Icons.my_location, size: 14),
+                    label: const Text('Use my location', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
               _Now(sample: r.current),
               const Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Divider()),
               const Padding(

@@ -75,6 +75,9 @@ class AccountProfile {
   /// Track Recorder records only for Enterprise or admin (canRecordTracks on the web)
   bool get canRecordTracks => isAdmin || plan == Plan.enterprise;
 
+  /// Renaming a track that reached the cloud: Pro, Enterprise or admin (canRenameCloudTracks)
+  bool get canRenameCloudTracks => isAdmin || plan != Plan.free;
+
   /// Live tracking monitor: Enterprise monitor360 or admin (is_monitor() on the server)
   bool get canMonitor => isAdmin || (plan == Plan.enterprise && role == UserRole.monitor360);
 

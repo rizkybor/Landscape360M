@@ -282,6 +282,7 @@ void main() {
       expect(asked, ['31.74.07.1010']);
       expect(find.text('Cipete Utara, Kebayoran Baru'), findsOneWidget);
       expect(find.text('Kota Adm. Jakarta Selatan · Near your location'), findsOneWidget);
+      expect(find.byKey(const Key('weather-use-location')), findsNothing);
       expect(find.text('32°C'), findsOneWidget);
       expect(find.text('Kamis'), findsOneWidget);
       expect(find.text('Sumber: BMKG · Wilayah: BIG'), findsOneWidget);
@@ -309,6 +310,7 @@ void main() {
         center: (lat: -6.236, lng: 106.793),
       );
       expect(find.text('Kota Adm. Jakarta Selatan · Map centre'), findsOneWidget);
+      expect(find.byKey(const Key('weather-use-location')), findsOneWidget); // a way to use the real position
     });
 
     testWidgets('outside Indonesia it says so and shows the default place', (tester) async {

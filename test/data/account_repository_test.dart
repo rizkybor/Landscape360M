@@ -185,6 +185,18 @@ void main() {
       expect((await repo().loadProfile())!.canUseSos, isFalse);
     });
 
+    test('keeps the last known plan, role and admin flag while offline', () async {
+      backend
+        ..user = _user()
+        ..row = {'status_subscribe': 'Enterprise', 'status_user': 'monitor360', 'phone': '0812', 'can_use_sos': true};
+      await repo().loadProfile();
+      backend.profileError = Exception('No internet');
+      final p = (await repo().loadProfile())!;
+      expect((p.plan, p.role, p.canRecordTracks, p.canUseSos), (Plan.enterprise, UserRole.monitor360, true, true));
+      // Only the access fields are kept on the phone, not personal data
+      expect(p.phone, isNull);
+    });
+
     test('the cached permission belongs to one account only', () async {
       backend
         ..user = _user(id: 'u1')

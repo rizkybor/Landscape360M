@@ -3,7 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Landscape 360 menampilkan posisi Anda di peta dan arah kompas. / Landscape 360 shows your position and compass direction on the map.</string>
+	<string>Landscape 360 menampilkan posisi Anda di peta dan arah kompas, dan merekam jejak Anda saat Anda menekan Start Recording, termasuk saat layar mati. / Landscape 360 shows your position and compass direction on the map, and records your track when you press Start Recording, also while the screen is off.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Landscape 360 merekam jejak Anda saat layar mati atau saat Anda membuka aplikasi lain, hanya selama perekaman berjalan. / Landscape 360 records your track while the screen is off or you use other apps, only while a recording runs.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

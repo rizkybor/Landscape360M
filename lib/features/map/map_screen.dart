@@ -17,6 +17,14 @@ import '../../core/ui/widgets.dart';
 import '../../domain/compass/device_heading.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/route/route_planner.dart';
+import '../../domain/survey/survey_model.dart';
+import '../../domain/tracks/track_recorder_geo.dart';
+import '../navigator/navigator_overlay.dart';
+import '../navigator/navigator_panel.dart';
+import '../navigator/navigator_state.dart';
+import '../tracks/track_layer.dart';
+import '../tracks/track_recorder_panel.dart';
+import '../tracks/track_recorder_state.dart';
 import 'location_puck.dart';
 import 'map_settings_controller.dart';
 import 'map_sheet.dart';
@@ -154,12 +162,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final dark = ref.watch(mapSettingsProvider.select((s) => s.style == MapStyle.satellite));
     final sheetInset = _headerHeight + MediaQuery.paddingOf(context).bottom;
     // Opening a tool lowers the sheet so the map is free (like the web)
-    ref.listen(routePlannerProvider.select((s) => s.enabled), (prev, enabled) {
+    void lowerSheet(bool? prev, bool enabled) {
       if (enabled && _sheet.isAttached) {
         _sheet.animateTo(peek, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
       }
-    });
+    }
+
+    ref
+      ..listen(routePlannerProvider.select((s) => s.enabled), lowerSheet)
+      ..listen(navigatorProvider.select((s) => s.enabled), lowerSheet)
+      ..listen(trackRecorderProvider.select((s) => s.panelOpen), lowerSheet);
     final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
+    final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
+    final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
+    final recordingHidden = !trackOpen && ref.watch(trackRecorderProvider.select((s) => s.active != null));
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
@@ -184,8 +200,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 bodyVisibility: _bodyVisibility,
               ),
             ),
-            if (routeOpen && _bodyVisibility == 0)
-              Positioned(left: 12, right: 12, bottom: sheetInset + 10, child: const RoutePanel()),
+            // The open tool's panel above the sheet; the REC pill sits on top while a
+            // recording runs with its panel closed
+            if (_bodyVisibility == 0)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: sheetInset + 10,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
+                    if (routeOpen) const RoutePanel(),
+                    if (navigatorOpen)
+                      NavigatorPanel(onShowSurvey: (doc) => ref.read(showSurveyProvider.notifier).show(doc)),
+                    if (trackOpen) const TrackRecorderPanel(),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -229,6 +262,20 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   TerrainLayers? _layers;
   RouteLayer? _route;
+  TrackLayer? _tracks;
+  Timer? _trackRedraw;
+  final _cameraTick = ValueNotifier<int>(0);
+  final _styleTick = ValueNotifier<int>(0);
+
+  /// Terrain height without the 3D exaggeration (0 where the terrain has not loaded)
+  Future<double> _elevationAt(double lng, double lat) async {
+    try {
+      final v = await _map?.getElevation(Point(coordinates: Position(lng, lat)));
+      return v == null ? 0 : realElevation(v, ref.read(mapSettingsProvider).appliedExaggeration);
+    } on Object {
+      return 0;
+    }
+  }
 
   // Compass: the needle follows the phone when it has a compass, else the GPS course
   StreamSubscription<CompassEvent>? _compassSub;
@@ -261,6 +308,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     _hintTimer?.cancel();
     _layers?.dispose();
     _settle?.cancel();
+    _trackRedraw?.cancel();
+    _cameraTick.dispose();
+    _styleTick.dispose();
     super.dispose();
   }
 
@@ -307,7 +357,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   }
 
   Future<void> _onMapCreated(MapboxMap map) async {
-    _map = map;
+    setState(() => _map = map); // the survey overlay needs the map
     final s = ref.read(mapSettingsProvider);
     await map.setCamera(
       CameraOptions(
@@ -318,15 +368,22 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       ),
     );
     await map.setBounds(CameraBoundsOptions(minZoom: minZoom, maxZoom: maxZoom, maxPitch: maxPitch));
-    // Taps on the map set route points while the route planner is open
+    // Taps on the map add survey points (Navigator) or route points (Route Planner)
     map.addInteraction(
       TapInteraction.onMap((context) {
-        if (!ref.read(routePlannerProvider).enabled) return;
-        HapticFeedback.lightImpact();
         final c = context.point.coordinates;
-        unawaited(ref.read(routePlannerProvider.notifier).tap((lng: c.lng.toDouble(), lat: c.lat.toDouble())));
+        final lng = c.lng.toDouble(), lat = c.lat.toDouble();
+        if (ref.read(navigatorProvider).enabled) {
+          HapticFeedback.lightImpact();
+          // Like the web, a tap always adds a point (and drops the point selection)
+          final nav = ref.read(navigatorProvider.notifier)..select(null);
+          unawaited(nav.addPointAt(lng, lat, _elevationAt));
+        } else if (ref.read(routePlannerProvider).enabled) {
+          HapticFeedback.lightImpact();
+          unawaited(ref.read(routePlannerProvider.notifier).tap((lng: lng, lat: lat)));
+        }
       }, stopPropagation: false),
-      interactionID: 'route-planner-tap',
+      interactionID: 'map-tap',
     );
     // Our own controls replace the built-in compass and scale bar
     await map.compass.updateSettings(CompassSettings(enabled: false));
@@ -354,6 +411,11 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       await route.show(ref.read(routePlannerProvider));
       final layers = _layers ??= TerrainLayers(map);
       await layers.install(ref.read(mapSettingsProvider));
+      final tracks = _tracks ??= TrackLayer(map);
+      await tracks.install();
+      await tracks.show(ref.read(trackRecorderProvider));
+      // Survey lines come back after a style change, above the contours and grid
+      _styleTick.value++;
       _scheduleSettled();
       if (!await map.styleLayerExists('sky')) {
         await map.addStyleLayer(
@@ -408,6 +470,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   }
 
   void _onCameraChanged(CameraChangedEventData e) {
+    _cameraTick.value++;
     _scheduleSettled();
     // Throttled like the web (at most every 100 ms); elevation waits for the map to settle
     final now = DateTime.now();
@@ -503,8 +566,27 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     );
   }
 
+  /// With location already allowed: show the puck and open the map where the user is
+  /// (not at the default Jakarta view), so "map centre" means their area too
   Future<void> _showPuckIfAllowed() async {
-    if (await _locationAllowed(ask: false)) await _enablePuck();
+    if (!await _locationAllowed(ask: false)) return;
+    await _enablePuck();
+    try {
+      final p =
+          await geo.Geolocator.getLastKnownPosition() ??
+          await geo.Geolocator.getCurrentPosition(
+            locationSettings: const geo.LocationSettings(
+              accuracy: geo.LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 6),
+            ),
+          );
+      // Only if the user has not moved the map away from the start yet
+      final c = (await _map?.getCameraState())?.center.coordinates;
+      if (c == null || (c.lng - defaultCenter.lng).abs() > 1e-4 || (c.lat - defaultCenter.lat).abs() > 1e-4) return;
+      await _map?.setCamera(CameraOptions(center: Point(coordinates: Position(p.longitude, p.latitude))));
+    } on Object {
+      // No fix yet: stay at the default view
+    }
   }
 
   /// "Go to my location": asks for permission only when tapped
@@ -547,6 +629,20 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     await map.flyTo(camera, MapAnimationOptions(duration: 800));
   }
 
+  /// A saved track in view, clear of the controls and the panel (fitBounds, max zoom 16)
+  Future<void> _fitTrack(List<TrackPoint> points) async {
+    final map = _map;
+    if (map == null || points.isEmpty) return;
+    final camera = await map.cameraForCoordinates(
+      [for (final p in points) Point(coordinates: Position(p.lng, p.lat))],
+      MbxEdgeInsets(top: 140, left: 40, bottom: _sheetInset + 320, right: 80),
+      null,
+      null,
+    );
+    if ((camera.zoom ?? 0) > 16) camera.zoom = 16;
+    await map.flyTo(camera, MapAnimationOptions(duration: 1200));
+  }
+
   Future<void> _zoomBy(double delta) async {
     final map = _map;
     if (map == null) return;
@@ -570,6 +666,37 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     ref.listen<RoutePlannerState>(routePlannerProvider, (prev, next) {
       unawaited(_route?.show(next));
       if (next.result != null && prev?.result != next.result) unawaited(_fitRoute(next.result!));
+    });
+    // The recording redraws at most once a second; a saved track at once, then the map fits it
+    ref.listen<TrackRecorderState>(trackRecorderProvider, (prev, next) {
+      if (prev?.viewing != next.viewing) {
+        _trackRedraw?.cancel();
+        _trackRedraw = null;
+        unawaited(_tracks?.show(next));
+        if (next.viewing != null) unawaited(_fitTrack(next.viewing!.points));
+      } else if (prev?.activePoints != next.activePoints) {
+        _trackRedraw ??= Timer(const Duration(seconds: 1), () {
+          _trackRedraw = null;
+          unawaited(_tracks?.show(ref.read(trackRecorderProvider)));
+        });
+      }
+      // Recording shows where you are
+      if (next.recording && !(prev?.recording ?? false) && !_puckOn) unawaited(_enablePuck());
+    });
+    ref.listen<SurveyDoc?>(showSurveyProvider, (_, doc) {
+      final b = doc?.bounds;
+      if (b == null || _map == null) return;
+      ref.read(showSurveyProvider.notifier).done();
+      // Centre of the survey, close up (like the web)
+      unawaited(
+        _map!.flyTo(
+          CameraOptions(
+            center: Point(coordinates: Position((b.$1.$1 + b.$2.$1) / 2, (b.$1.$2 + b.$2.$2) / 2)),
+            zoom: 16,
+          ),
+          MapAnimationOptions(duration: 2000),
+        ),
+      );
     });
     ref.listen<FlyTarget?>(flyToProvider, (_, target) {
       final map = _map;
@@ -631,6 +758,15 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
           ),
         // Crosshair: the telemetry describes this point
         const IgnorePointer(child: Center(child: _Crosshair())),
+        if (_map != null)
+          Positioned.fill(
+            child: NavigatorOverlay(
+              map: _map!,
+              cameraTick: _cameraTick,
+              styleTick: _styleTick,
+              elevationAt: _elevationAt,
+            ),
+          ),
         Positioned(
           left: 12,
           top: top,

@@ -170,19 +170,21 @@ void main() {
       expect(find.byType(BrandName), findsOneWidget);
       expect(find.byTooltip('Sign in'), findsOneWidget);
       // Same tools as the web's phone layout
-      expect(
-        tester.widget<ToolTile>(find.ancestor(of: find.text('Route'), matching: find.byType(ToolTile))).enabled,
-        isTrue,
-      );
-      for (final name in ['Navigator', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps']) {
+      for (final name in ['Navigator', 'Route']) {
+        expect(
+          tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
+          isTrue,
+        );
+      }
+      for (final name in ['POIs', 'Marked', 'Areas', 'Basemaps']) {
         expect(
           tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
           isFalse,
         );
       }
-      await tester.tap(find.byKey(const Key('tool-Navigator')));
+      await tester.tap(find.byKey(const Key('tool-POIs')));
       await tester.pump();
-      expect(find.text('Navigator is coming to the app soon.'), findsOneWidget);
+      expect(find.text('POIs is coming to the app soon.'), findsOneWidget);
       await tester.tap(find.byKey(const Key('guide')));
       await tester.pumpAndSettle();
       expect(find.text('Quick Start Guide'), findsOneWidget);
