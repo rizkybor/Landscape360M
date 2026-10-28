@@ -65,6 +65,14 @@ class FakeBackend implements AccountBackend {
   Future<void> updateDisplayName(String name) async => calls.add('updateDisplayName:$name');
 }
 
+class TokenSession implements SessionSource {
+  @override
+  String? get accessToken => 'token-1';
+
+  @override
+  Future<String?> refresh() async => null;
+}
+
 class NoSession implements SessionSource {
   @override
   String? get accessToken => null;
@@ -94,11 +102,11 @@ void main() {
     apiResponse = http.Response('{"ok":true}', 201);
   });
 
-  AccountRepository repo() => AccountRepository(
+  AccountRepository repo({SessionSource? session}) => AccountRepository(
     backend: backend,
     api: ApiClient(
       baseUrl: 'https://landscape360.jcdigital.co.id',
-      session: NoSession(),
+      session: session ?? NoSession(),
       client: MockClient((req) async {
         posted.add(req);
         return apiResponse;
@@ -183,6 +191,18 @@ void main() {
       expect((await repo().loadProfile())!.canUseSos, isFalse);
       backend.profileError = Exception('No internet');
       expect((await repo().loadProfile())!.canUseSos, isFalse);
+    });
+
+    test('keeps the last known plan, role and admin flag while offline', () async {
+      backend
+        ..user = _user()
+        ..row = {'status_subscribe': 'Enterprise', 'status_user': 'monitor360', 'phone': '0812', 'can_use_sos': true};
+      await repo().loadProfile();
+      backend.profileError = Exception('No internet');
+      final p = (await repo().loadProfile())!;
+      expect((p.plan, p.role, p.canRecordTracks, p.canUseSos), (Plan.enterprise, UserRole.monitor360, true, true));
+      // Only the access fields are kept on the phone, not personal data
+      expect(p.phone, isNull);
     });
 
     test('the cached permission belongs to one account only', () async {
@@ -318,6 +338,43 @@ void main() {
         repo().requestAccount(valid),
         throwsA(isA<AccountException>().having((e) => e.message, 'message', 'Too many requests')),
       );
+    });
+  });
+
+  group('delete account', () {
+    setUp(() => backend.user = _user());
+
+    test('checks the password first; a wrong one deletes nothing', () async {
+      backend.wrongPasswordFor = 'bad';
+      await expectLater(
+        repo(session: TokenSession()).deleteAccount(password: 'bad'),
+        throwsA(isA<AccountException>().having((e) => e.message, 'message', 'Your password is not correct')),
+      );
+      await expectLater(repo(session: TokenSession()).deleteAccount(password: ''), throwsA(isA<AccountException>()));
+      expect(posted, isEmpty);
+    });
+
+    test('DELETE /api/account with the token, then forgets the account on the phone and signs out', () async {
+      final prefs = SharedPreferencesAsync();
+      await prefs.setString('l360-access-u1', '{}');
+      await prefs.setBool('l360-can-use-sos-u1', true);
+      apiResponse = http.Response('{"ok":true}', 200);
+      await repo(session: TokenSession()).deleteAccount(password: 'pass12345');
+      expect(posted.single.method, 'DELETE');
+      expect(posted.single.url.toString(), 'https://landscape360.jcdigital.co.id/api/account');
+      expect(posted.single.headers['Authorization'], 'Bearer token-1');
+      expect(backend.calls, ['signIn:budi@example.com', 'signOut']);
+      expect(await prefs.getString('l360-access-u1'), isNull);
+      expect(await prefs.getBool('l360-can-use-sos-u1'), isNull);
+    });
+
+    test("the server's refusal is shown and the account stays signed in", () async {
+      apiResponse = http.Response('{"error":"The admin account cannot be deleted. Contact support."}', 403);
+      await expectLater(
+        repo(session: TokenSession()).deleteAccount(password: 'pass12345'),
+        throwsA(isA<AccountException>().having((e) => e.message, 'message', contains('admin account'))),
+      );
+      expect(backend.calls, isNot(contains('signOut')));
     });
   });
 }

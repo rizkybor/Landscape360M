@@ -20,6 +20,17 @@ CompassReading? readNativeCompass({required double? heading, required double? ac
   return CompassReading(heading: accuracy != null && accuracy < 0 ? null : _normalize(heading), accuracy: accuracy);
 }
 
+/// Reading from the flutter_compass plugin. Its accuracy is in degrees on iOS (-1 = not
+/// calibrated); on Android it is 15 / 30 / 45 for the sensor's high / medium / low status and
+/// -1 while the sensor has not reported one yet, which means "unknown", not "uncalibrated".
+CompassReading? readPluginCompass({required double? heading, required double? accuracy, required bool android}) {
+  final a = android && (accuracy == null || accuracy < 0) ? null : accuracy;
+  return readNativeCompass(heading: heading, accuracy: a);
+}
+
+/// Preference set once the user closes the calibration hint (same key as the web)
+const compassHintDismissedKey = 'l360-compass-hint-dismissed';
+
 // The app cannot calibrate the sensor (the phone does, with the figure-8 motion); it can
 // only notice when readings are not trustworthy. With an accuracy that is used; without
 // one, a jump of 40°+ between two readings a few ms apart (impossible by hand) counts as

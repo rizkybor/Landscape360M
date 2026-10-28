@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/account/about_screen.dart';
 import '../features/account/account_screen.dart';
+import '../features/account/delete_account.dart';
 import '../features/account/login_screen.dart';
 import '../features/account/request_account_screen.dart';
 import '../features/map/map_screen.dart';
@@ -13,12 +15,14 @@ GoRouter buildRouter({required bool Function() isSignedIn, Listenable? refresh})
     GoRoute(path: '/', builder: (_, _) => const MapScreen()),
     GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     GoRoute(path: '/request-account', builder: (_, _) => const RequestAccountScreen()),
+    GoRoute(path: '/about', builder: (_, _) => const AboutScreen()),
     GoRoute(
       path: '/account',
       builder: (_, _) => const AccountScreen(),
       routes: [
         GoRoute(path: 'edit', builder: (_, _) => const EditProfileScreen()),
         GoRoute(path: 'password', builder: (_, _) => const ChangePasswordScreen()),
+        GoRoute(path: 'delete', builder: (_, _) => const DeleteAccountScreen()),
       ],
     ),
   ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:landscape360/core/providers.dart';
+import 'package:landscape360/core/ui/widgets.dart';
 import 'package:landscape360/domain/map/map_settings.dart';
 import 'package:landscape360/features/map/map_settings_controller.dart';
 import 'package:landscape360/features/map/map_sheet.dart';
@@ -94,34 +95,123 @@ void main() {
       expect((s.view, s.style), (MapView.threeD, MapStyle.outdoors));
     });
 
-    testWidgets('Terrain tab changes the exaggeration within its limits', (tester) async {
+    testWidgets('Terrain tab: contours and height work in 3D, the grid in both views', (tester) async {
       await pump(tester);
       await tester.tap(find.byKey(const Key('section-terrain')));
       await tester.pumpAndSettle();
+
+      // 2D: the hint shows, contour controls are off, the grid still works
       expect(find.textContaining('Switch Map View to 3D'), findsOneWidget);
-      await tester.drag(find.byKey(const Key('exaggeration')), const Offset(1000, 0));
+      await tester.tap(find.byKey(const Key('contours-toggle')));
+      await tester.drag(
+        find.descendant(of: find.byKey(const Key('exaggeration')), matching: find.byType(Slider)),
+        const Offset(1000, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(container.read(mapSettingsProvider).showContours, isTrue);
+      expect(container.read(mapSettingsProvider).exaggeration, defaultExaggeration);
+      await tester.tap(find.byKey(const Key('grid-toggle')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('30" (~900m)'));
+      await tester.tap(find.text('30" (~900m)'));
+      await tester.pumpAndSettle();
+      expect(
+        (container.read(mapSettingsProvider).showGrid, container.read(mapSettingsProvider).gridStep),
+        (true, 30 / 3600),
+      );
+      await tester.tap(find.text('Auto (Dynamic)'));
+      expect(container.read(mapSettingsProvider).gridStep, isNull);
+
+      // 3D from the hint: interval presets and the height slider (0.1 to 10x) respond
+      await tester.ensureVisible(find.byKey(const Key('terrain-hint')));
+      await tester.tap(find.descendant(of: find.byKey(const Key('terrain-hint')), matching: find.text('3D Terrain')));
+      await tester.pumpAndSettle();
+      expect(container.read(mapSettingsProvider).view, MapView.threeD);
+      await tester.ensureVisible(find.text('12.5m'));
+      await tester.tap(find.text('12.5m'));
+      await tester.pumpAndSettle();
+      expect(container.read(mapSettingsProvider).contourInterval, 12.5);
+      await tester.ensureVisible(find.byKey(const Key('exaggeration')));
+      await tester.drag(
+        find.descendant(of: find.byKey(const Key('exaggeration')), matching: find.byType(Slider)),
+        const Offset(1000, 0),
+      );
       await tester.pumpAndSettle();
       expect(container.read(mapSettingsProvider).exaggeration, maxExaggeration);
+      // Contours off: their settings hide (like the grid's); the height slider stays
+      expect(find.text('Opacity Contours'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('contours-toggle')));
+      await tester.pumpAndSettle();
+      expect(container.read(mapSettingsProvider).showContours, isFalse);
+      expect(find.text('Opacity Contours'), findsNothing);
+      expect(find.byKey(const Key('contour-interval')), findsNothing);
+      expect(find.text('12.5m'), findsNothing);
+      expect(find.byKey(const Key('exaggeration')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('contours-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('Opacity Contours'), findsOneWidget);
     });
 
-    testWidgets('header offers guide, sharing and signing in; tools not built yet say so', (tester) async {
+    testWidgets('tool tiles are equal squares in two full rows', (tester) async {
       await pump(tester);
-      expect(find.byKey(const Key('share-app')), findsOneWidget);
+      final names = ['Navigator', 'Route', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps', 'GPS'];
+      final rects = [for (final n in names) tester.getRect(find.byKey(Key('tool-$n')))];
+      for (final r in rects) {
+        expect(r.width, rects.first.width);
+        expect(r.height, r.width);
+      }
+      // Even gaps in the first row
+      for (var i = 1; i < 4; i++) {
+        expect(rects[i].left - rects[i - 1].right, closeTo(10, 0.01));
+      }
+      // Second row right under the first, edge to edge
+      expect(rects[4].left, closeTo(rects[0].left, 0.01));
+      expect(rects[7].right, closeTo(rects[3].right, 0.01));
+      expect(rects[4].top - rects[0].bottom, closeTo(10, 0.01));
+    });
+
+    testWidgets('header offers guide, weather, search and signing in; every tool is there', (tester) async {
+      await pump(tester);
+      // No app sharing in the native app
+      expect(find.byKey(const Key('share-app')), findsNothing);
+      expect(find.byKey(const Key('weather')), findsOneWidget);
+      expect(find.byKey(const Key('search')), findsOneWidget);
+      expect(find.byType(BrandName), findsOneWidget);
       expect(find.byTooltip('Sign in'), findsOneWidget);
       // Same tools as the web's phone layout
-      for (final name in ['Navigator', 'Route', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps']) {
+      for (final name in ['Navigator', 'Route', 'Track', 'POIs', 'Marked', 'Areas', 'Basemaps', 'GPS']) {
         expect(
           tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
-          isFalse,
+          isTrue,
         );
       }
-      await tester.tap(find.byKey(const Key('tool-Navigator')));
-      await tester.pump();
-      expect(find.text('Navigator is coming to the app soon.'), findsOneWidget);
+      // Signed out, the tools that keep data in the account look disabled and all open the
+      // same Sign in sheet; the others stay as they are
+      double opacityOf(String name) => tester
+          .widget<Opacity>(find.descendant(of: find.byKey(Key('tool-$name')), matching: find.byType(Opacity)))
+          .opacity;
+      for (final name in ['Track', 'Marked', 'Areas', 'Basemaps', 'GPS']) {
+        expect(opacityOf(name), 0.5, reason: name);
+      }
+      for (final name in ['Navigator', 'Route', 'POIs']) {
+        expect(opacityOf(name), 1, reason: name);
+      }
+      for (final (name, title) in [
+        ('Basemaps', 'Custom Basemaps'),
+        ('GPS', 'GPS Tracking'),
+        ('Track', 'Track Recorder'),
+      ]) {
+        await tester.tap(find.byKey(Key('tool-$name')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('sign-in-sheet')), findsOneWidget);
+        expect(find.text(title), findsOneWidget);
+        expect(find.byKey(const Key('sign-in-sheet-login')), findsOneWidget);
+        await tester.tapAt(const Offset(200, 40));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.byKey(const Key('guide')));
       await tester.pumpAndSettle();
       expect(find.text('Quick Start Guide'), findsOneWidget);
-      expect(appShareText, endsWith('https://landscape360.jcdigital.co.id/'));
     });
   });
 }

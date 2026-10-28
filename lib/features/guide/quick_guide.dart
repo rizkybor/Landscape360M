@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 
@@ -84,6 +85,12 @@ const _entries = <(IconData, String, String)>[
         'message, location and battery to the admin.',
   ),
   (
+    Icons.navigation_outlined,
+    'GPS Tracking [Pro & Enterprise]',
+    'Tools > GPS shares your live position with your team\'s monitors, also with the screen off. Monitor accounts '
+        'follow every active member on the website.',
+  ),
+  (
     Icons.person_add_alt,
     'Request an Account',
     'No account yet? Open Sign In, choose Request Account and fill in the form. We will email your login details '
@@ -136,6 +143,19 @@ Future<void> showQuickGuide(BuildContext context) => showModalBottomSheet<void>(
               ],
             ),
           ),
+        Center(
+          child: TextButton.icon(
+            key: const Key('guide-about'),
+            onPressed: () {
+              // Taken before the sheet closes and its context goes away
+              final router = GoRouter.of(context);
+              Navigator.pop(context);
+              router.push('/about');
+            },
+            icon: const Icon(Icons.info_outline, size: 18),
+            label: const Text('About, privacy and support'),
+          ),
+        ),
       ],
     ),
   ),

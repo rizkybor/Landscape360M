@@ -45,7 +45,7 @@ String? accountRequestError(AccountRequestInput i) {
   if (phone.isNotEmpty && (!_phone.hasMatch(phone) || !isValidPhone(phone))) {
     return 'A valid phone / WhatsApp number (8 to 15 digits) is required';
   }
-  if (i.message.trim().isEmpty) return 'Tell us how you will use Landscape 360';
+  if (i.message.trim().isEmpty) return 'Tell us how you will use Landscape 360 app';
   if (i.message.trim().length > 1000) return 'Message is too long (max 1000 characters)';
   return null;
 }

@@ -9,6 +9,11 @@ import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import '../../domain/account/account_rules.dart';
 import '../../domain/account/profile.dart';
+import '../offline/offline_ui.dart';
+import '../sos/sos_alerts.dart';
+import '../sos/sos_screen.dart';
+import '../sos/sos_state.dart';
+import 'delete_account.dart';
 
 /// User Account: profile, plan / role badges, cloud storage, edit, password, sign out.
 /// Admins get a link to the admin panel, which stays on the web.
@@ -17,6 +22,10 @@ class AccountScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Signed out (here, on another device, or the session ended): back to the map
+    ref.listen(authUserIdProvider, (prev, next) {
+      if (prev?.value != null && next.hasValue && next.value == null && context.mounted) context.go('/');
+    });
     final profile = ref.watch(profileProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('User Account')),
@@ -24,10 +33,43 @@ class AccountScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
             Padding(padding: const EdgeInsets.all(L360.gutter), child: ErrorBanner('Could not load your account: $e')),
-        data: (p) => p == null ? const Center(child: Text('Signed out')) : _AccountBody(profile: p),
+        data: (p) => p == null ? const _SignedOut() : _AccountBody(profile: p),
       ),
     );
   }
+}
+
+/// Shown for a moment after signing out, or if the account page is reached without a session
+class _SignedOut extends StatelessWidget {
+  const _SignedOut();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    key: const Key('signed-out'),
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('assets/images/logo.png', width: 80, height: 80),
+          const SizedBox(height: 12),
+          const BrandName(textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          Text("You're signed out", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          const Text(
+            'The map still works. Sign in to use your account.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: L360Colors.sand600),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(onPressed: () => context.go('/login'), child: const Text('Sign in')),
+          const SizedBox(height: 10),
+          OutlinedButton(onPressed: () => context.go('/'), child: const Text('Back to the map')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _AccountBody extends ConsumerWidget {
@@ -51,9 +93,11 @@ class _AccountBody extends ConsumerWidget {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !context.mounted) return;
+    // Taken before signing out: this page is replaced as soon as the session ends
+    final router = GoRouter.of(context);
     await ref.read(accountRepositoryProvider).signOut();
-    if (context.mounted) context.go('/');
+    router.go('/');
   }
 
   @override
@@ -98,6 +142,18 @@ class _AccountBody extends ConsumerWidget {
             ],
           ),
           GroupedSection(
+            title: 'On this phone',
+            children: [
+              ListTile(
+                key: const Key('account-offline'),
+                leading: const TileIcon(Icons.download_for_offline_outlined),
+                title: const Text('Offline maps'),
+                trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                onTap: () => showOfflineSheet(context),
+              ),
+            ],
+          ),
+          GroupedSection(
             title: 'Security',
             children: [
               ListTile(
@@ -111,8 +167,34 @@ class _AccountBody extends ConsumerWidget {
           if (p.isAdmin)
             GroupedSection(
               title: 'Admin',
-              footer: 'Manage users, account requests, activity, broadcast and points of interest on the web.',
+              footer:
+                  'Manage users, account requests, activity, broadcast and points of interest on the web. '
+                  'S.O.S alerts are checked every 30 s while the app is open.',
               children: [
+                ListTile(
+                  key: const Key('admin-sos-alerts'),
+                  leading: const TileIcon(Icons.sos, color: L360Colors.brick500, background: L360Colors.brick50),
+                  title: const Text('S.O.S alerts'),
+                  subtitle: Consumer(
+                    builder: (context, ref, _) {
+                      final n = ref.watch(sosAlertsProvider.select((s) => s.active.length));
+                      return Text(n == 0 ? 'No active S.O.S' : '$n active');
+                    },
+                  ),
+                  trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                  onTap: () => showSosAlertsSheet(context),
+                ),
+                ListTile(
+                  key: const Key('admin-sos-open'),
+                  leading: const TileIcon(
+                    Icons.emergency_outlined,
+                    color: L360Colors.brick500,
+                    background: L360Colors.brick50,
+                  ),
+                  title: const Text('Open S.O.S screen'),
+                  subtitle: const Text('Admins raise S.O.S here; others hold the red button on the map'),
+                  onTap: () => openSosScreen(context, ref),
+                ),
                 ListTile(
                   leading: const TileIcon(
                     Icons.admin_panel_settings_outlined,
@@ -128,6 +210,18 @@ class _AccountBody extends ConsumerWidget {
           GroupedSection(
             children: [
               ListTile(
+                key: const Key('account-about'),
+                leading: const TileIcon(Icons.info_outline),
+                title: const Text('About Landscape 360'),
+                subtitle: const Text('Version, privacy, terms and support'),
+                trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                onTap: () => context.push('/about'),
+              ),
+            ],
+          ),
+          GroupedSection(
+            children: [
+              ListTile(
                 key: const Key('sign-out'),
                 leading: const TileIcon(Icons.logout, color: L360Colors.brick500, background: L360Colors.brick50),
                 title: const Text(
@@ -138,6 +232,22 @@ class _AccountBody extends ConsumerWidget {
               ),
             ],
           ),
+          if (!p.isAdmin)
+            GroupedSection(
+              footer: 'Deletes the account and everything in it for good.',
+              children: [
+                ListTile(
+                  key: const Key('delete-account'),
+                  leading: const TileIcon(
+                    Icons.person_remove_outlined,
+                    color: L360Colors.brick500,
+                    background: L360Colors.brick50,
+                  ),
+                  title: const Text('Delete account', style: TextStyle(color: L360Colors.brick500)),
+                  onTap: () => confirmDeleteAccount(context, ref),
+                ),
+              ],
+            ),
         ],
       ),
     );

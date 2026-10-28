@@ -1,0 +1,18 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.co.jcdigital.landscape360",
+      "sha256_cert_fingerprints": ["PLAY_APP_SIGNING_SHA256"]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.co.jcdigital.landscape360.dev",
+      "sha256_cert_fingerprints": ["A5:47:9D:4D:90:03:D4:2A:33:EE:E3:72:63:47:F5:B2:6F:90:EC:DC:CA:DB:93:28:9D:F7:53:8C:15:B6:5D:E7"]
+    }
+  }
+]

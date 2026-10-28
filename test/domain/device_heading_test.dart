@@ -24,6 +24,27 @@ void main() {
     });
   });
 
+  group('readPluginCompass', () {
+    test('Android: -1 before the sensor reports means unknown, not uncalibrated', () {
+      final r = readPluginCompass(heading: 120, accuracy: -1, android: true)!;
+      expect((r.heading, r.accuracy), (120.0, null));
+      final q = CompassQualityTracker();
+      expect(q.push(r, 0), CompassQuality.ok);
+    });
+
+    test('Android: low sensor status (45) is poor, high (15) is ok', () {
+      final q = CompassQualityTracker();
+      expect(q.push(readPluginCompass(heading: 10, accuracy: 45, android: true)!, 0), CompassQuality.poor);
+      expect(q.push(readPluginCompass(heading: 10, accuracy: 15, android: true)!, 0), CompassQuality.ok);
+    });
+
+    test('iOS: -1 means not calibrated', () {
+      final r = readPluginCompass(heading: 120, accuracy: -1, android: false)!;
+      expect(r.heading, isNull);
+      expect(CompassQualityTracker().push(r, 0), CompassQuality.poor);
+    });
+  });
+
   group('CompassQualityTracker', () {
     test('with accuracy: poor while uncalibrated or inaccurate, ok otherwise', () {
       final q = CompassQualityTracker();

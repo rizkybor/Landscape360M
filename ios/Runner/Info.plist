@@ -3,7 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Landscape 360 menampilkan posisi Anda di peta dan arah kompas. / Landscape 360 shows your position and compass direction on the map.</string>
+	<string>Landscape 360 menampilkan posisi dan arah kompas Anda di peta. Saat Anda merekam jejak, membagikan posisi dengan GPS Tracking, atau mengirim S.O.S, lokasi tetap dipakai saat layar mati. / Landscape 360 shows your position and compass direction on the map. While you record a track, share your position with GPS Tracking or send an S.O.S, it keeps using your location with the screen off.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Landscape 360 memakai lokasi saat layar mati atau saat Anda membuka aplikasi lain, hanya selama rekam jejak, GPS Tracking atau S.O.S berjalan. / Landscape 360 uses your location while the screen is off or you use other apps, only while a track recording, GPS Tracking or an S.O.S runs.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Landscape 360 menyimpan laporan survei yang Anda ekspor ke Foto saat Anda memilih Save Image. / Landscape 360 saves the survey report you export to Photos when you choose Save Image.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

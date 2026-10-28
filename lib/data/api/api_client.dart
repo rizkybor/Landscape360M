@@ -86,7 +86,7 @@ class ApiClient {
       );
     }
     if (payload is! Map<String, dynamic>) {
-      throw const ApiException('The Landscape 360 server answered unexpectedly. Try again later.');
+      throw const ApiException('The Landscape 360 app server answered unexpectedly. Try again later.');
     }
     return payload;
   }

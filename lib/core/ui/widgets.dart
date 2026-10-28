@@ -1,9 +1,23 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+
+/// Turns the frosted blur of the [GlassPanel]s below it on or off. Off while the map's
+/// controls are faded: a blur stays visible however transparent the panel is.
+class GlassBlur extends InheritedWidget {
+  const GlassBlur({super.key, required this.enabled, required super.child});
+
+  final bool enabled;
+
+  static bool of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassBlur>()?.enabled ?? true;
+
+  @override
+  bool updateShouldNotify(GlassBlur old) => old.enabled != enabled;
+}
 
 /// Frosted panel that floats over the map
 class GlassPanel extends StatelessWidget {
@@ -14,23 +28,25 @@ class GlassPanel extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: L360.shadow),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.82),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 0.8),
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
+  Widget build(BuildContext context) {
+    final face = DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 0.8),
       ),
-    ),
-  );
+      child: Padding(padding: padding, child: child),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: L360.shadow),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: GlassBlur.of(context)
+            ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: face)
+            : face,
+      ),
+    );
+  }
 }
 
 /// Round frosted map button (44 pt), with a light tap haptic
@@ -208,3 +224,83 @@ class BusyButton extends StatelessWidget {
         : Text(label),
   );
 }
+
+/// Reports its child's size after layout (e.g. so a sheet can be as tall as its content)
+class MeasureSize extends SingleChildRenderObjectWidget {
+  const MeasureSize({super.key, required this.onChange, required super.child});
+
+  final ValueChanged<Size> onChange;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderMeasureSize(onChange);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderMeasureSize renderObject) => renderObject.onChange = onChange;
+}
+
+class RenderMeasureSize extends RenderProxyBox {
+  RenderMeasureSize(this.onChange);
+
+  ValueChanged<Size> onChange;
+  Size? _last;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final size = this.size;
+    if (size == _last) return;
+    _last = size;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onChange(size));
+  }
+}
+
+/// "Landscape 360 app": the product name of the mobile app, with "app" in the ember orange
+/// of the logo's pin
+class BrandName extends StatelessWidget {
+  const BrandName({super.key, this.fontSize = 17, this.color = L360Colors.forest800, this.textAlign});
+
+  final double fontSize;
+  final Color color;
+  final TextAlign? textAlign;
+
+  @override
+  Widget build(BuildContext context) => Text.rich(
+    TextSpan(
+      children: brandSpans(fontSize: fontSize, color: color, weight: FontWeight.w700),
+    ),
+    textAlign: textAlign,
+    style: TextStyle(fontSize: fontSize, letterSpacing: -0.3),
+  );
+}
+
+/// The brand inside a sentence: "Landscape 360 " in the sentence's colour, then a smaller
+/// ember "app" raised so its top lines up with the top of "360"
+List<InlineSpan> brandSpans({double fontSize = 14, Color? color, FontWeight? weight}) => [
+  TextSpan(
+    text: 'Landscape 360 ',
+    style: TextStyle(fontSize: fontSize, color: color, fontWeight: weight),
+  ),
+  WidgetSpan(
+    alignment: PlaceholderAlignment.baseline,
+    baseline: TextBaseline.alphabetic,
+    child: Transform.translate(
+      // Inter: digits are ~0.73 em tall, lowercase ~0.55 em; lift by the difference
+      offset: Offset(0, -fontSize * (_interDigitHeight - _interXHeight * brandAppScale)),
+      child: Text(
+        'app',
+        style: TextStyle(
+          fontSize: fontSize * brandAppScale,
+          color: L360Colors.ember500,
+          fontWeight: weight ?? FontWeight.w700,
+          letterSpacing: 0,
+          height: 1,
+        ),
+      ),
+    ),
+  ),
+];
+
+/// Size of "app" relative to "Landscape 360"
+const brandAppScale = 0.65;
+const _interDigitHeight = 0.727;
+const _interXHeight = 0.546;

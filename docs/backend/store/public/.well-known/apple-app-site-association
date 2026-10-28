@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["APPLE_TEAM_ID.id.co.jcdigital.landscape360"],
+        "components": [
+          { "/": "/", "?": { "at": "*" }, "comment": "Shared position" },
+          { "/": "/", "?": { "place": "*" }, "comment": "Shared marked location" },
+          { "/": "/", "?": { "area": "*" }, "comment": "Shared marked area" }
+        ]
+      }
+    ]
+  }
+}

@@ -40,6 +40,13 @@ class MapSettingsController extends Notifier<MapSettings> {
   void setExaggeration(double value) =>
       _update(state.copyWith(exaggeration: value.clamp(minExaggeration, maxExaggeration)));
   void setCoordFormat(CoordFormat format) => _update(state.copyWith(coordFormat: format));
+  void setShowContours(bool show) => _update(state.copyWith(showContours: show));
+  void setContourInterval(double meters) => _update(state.copyWith(contourInterval: meters.clamp(10.0, 500.0)));
+  void setContourOpacity(double value) => _update(state.copyWith(contourOpacity: value.clamp(0.0, 1.0)));
+  void setShowGrid(bool show) => _update(state.copyWith(showGrid: show));
+  void setShowPois(bool show) => _update(state.copyWith(showPois: show));
+  void setGridOpacity(double value) => _update(state.copyWith(gridOpacity: value.clamp(0.0, 1.0)));
+  void setGridStep(double? degrees) => _update(state.copyWith(gridStep: () => degrees));
 }
 
 final mapSettingsProvider = NotifierProvider<MapSettingsController, MapSettings>(MapSettingsController.new);
