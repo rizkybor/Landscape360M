@@ -234,3 +234,31 @@ Batas sama dengan web (dicek ulang server): Free 1 peta ≤ 1 MB, Pro 3 peta ≤
 | 7d.9 | Mode pesawat, geser ke area yang tidak diunduh | Peta kosong di sana (wajar) | | |
 | 7d.10 | Peta yang diunduh di HP / web lain | "Not on this phone" → ⋯ → Download to this phone | | |
 | 7d.11 | ⋯ → Show on map / Delete | Peta ke area itu / terhapus dari HP dan akun | | |
+
+## Fase 7e — Basemap kustom (Enterprise / admin)
+
+Unggah basemap (GeoTIFF / PDF) tetap lewat web; aplikasi menampilkannya.
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7e.1 | Belum login → Tools → Basemaps | "Sign in to use your custom basemaps." | | |
+| 7e.2 | Akun Free / Pro → Basemaps | Gembok "available for Enterprise accounts" | | |
+| 7e.3 | Akun Enterprise: unggah satu basemap di web, lalu Basemaps di app | Basemap muncul di daftar dengan ukuran; pemakaian "x MB of 5 MB" | | |
+| 7e.4 | Nyalakan (switch) | Gambar tampil di peta di posisinya, di bawah penanda / area / garis; "on this phone" | | |
+| 7e.5 | Geser Opacity | Gambar makin transparan | | |
+| 7e.6 | Ikon fokus | Peta menyesuaikan ke basemap | | |
+| 7e.7 | **Mode pesawat, tutup & buka app** | **Basemap yang menyala tetap tampil** | | |
+| 7e.8 | Matikan di app | Hilang dari peta; di web juga mati | | |
+| 7e.9 | ⋯ → Delete | Hilang dari app dan web | | |
+
+## Fase 7f — Ekspor laporan
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7f.1 | Navigator: buat 4–6 titik di 2 sheet, tutup Navigator; tombol kamera (kanan) | Pilihan Save as PNG / Save as JPG / Export to PDF | | |
+| 7f.2 | Export to PDF | "Preparing the report…", lalu lembar berbagi dengan satu PDF | | |
+| 7f.3 | Buka PDF (Files / Books) | Halaman 1: header, peta seperti di layar dengan titik bernomor + mdpl, kotak Map Center / elevasi / heading / zoom, tabel titik (kolom Line karena 2 sheet). Halaman 2: profil elevasi dengan Min/Max/Total/Gain, Marked Locations yang terlihat di peta | | |
+| 7f.4 | Angka di tabel | Dist. dan Total sama dengan daftar Points di Navigator; Total mulai dari 0 di setiap sheet | | |
+| 7f.5 | Save as JPG | Satu JPG per halaman, bisa disimpan ke Photos | | |
+| 7f.6 | Tanpa titik survei | Laporan tetap dibuat: peta + "No Survey Data Available" | | |
+| 7f.7 | Ukuran file | PDF 2 halaman kira-kira < 2 MB | | |

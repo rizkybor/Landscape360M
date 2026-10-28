@@ -136,7 +136,8 @@ void main() {
     });
   });
 
-  Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 30));
+  // Room for the SQLite writes even when the whole suite runs in parallel
+  Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 80));
 
   Future<ProviderContainer> signedIn({
     bool admin = false,
@@ -370,7 +371,7 @@ void main() {
   test('online mode uploads while recording, only when something changed', () async {
     // Waits for the uploads by condition, not by a fixed time (the suite runs in parallel)
     Future<void> until(bool Function() done) async {
-      for (var i = 0; i < 100 && !done(); i++) {
+      for (var i = 0; i < 250 && !done(); i++) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
       expect(done(), isTrue);

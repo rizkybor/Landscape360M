@@ -95,7 +95,7 @@ void main() {
     expect(gapBelowFooter(), lessThan(80));
   });
 
-  testWidgets('switching sections fits the sheet to each, and the tabs never scroll away', (tester) async {
+  testWidgets('every section shows at its own height, and the tabs never scroll away', (tester) async {
     SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
     tester.view.physicalSize = const Size(1170, 2532); // iPhone 13
     tester.view.devicePixelRatio = 3;
@@ -127,37 +127,85 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    // Open on Tools, then a taller section: the sheet keeps its height and the section
-    // scrolls; back to the shorter one, the sheet comes down to it (no empty space)
+    double top() => tester.getTopLeft(find.byKey(const Key('section-tools'))).dy;
+    // Every section ends at its own height, the same way whatever the order: Tools and Map
+    // fit their content (no white space), Terrain stops at 90% of the screen and scrolls
+    const terrainTop = screen * 0.1;
+    Future<void> fitsThrough(List<String> sections) async {
+      for (final s in sections) {
+        await tab(s);
+        if (s == 'terrain') {
+          expect(top(), closeTo(terrainTop + 140, 30), reason: 'Terrain at 90%');
+        } else {
+          expect(gap(), inInclusiveRange(0, 80), reason: '$s fits its content');
+        }
+      }
+    }
+
     await tester.drag(find.byKey(const Key('section-tools')), const Offset(0, -2000));
     await tester.pumpAndSettle();
     expect(gap(), inInclusiveRange(0, 80));
-    final openTop = tester.getTopLeft(find.byKey(const Key('section-tools'))).dy;
-    await tab('map');
-    expect(tester.getTopLeft(find.byKey(const Key('section-tools'))).dy, openTop, reason: 'same height');
-    await tab('tools');
-    expect(gap(), inInclusiveRange(0, 80), reason: 'back to the shorter one, no empty space');
+    await fitsThrough(['map', 'terrain', 'tools', 'terrain', 'map', 'tools', 'map']);
+    final mapTop = top();
+    await fitsThrough(['tools', 'map']);
+    expect(top(), mapTop, reason: 'the same section always gets the same height');
+
+    // Terrain to Tools slides down (no cut to the new height in one frame)
+    await tab('terrain');
+    final from = top();
+    await tester.tap(find.byKey(const Key('section-tools')));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 16)); // frames, as on screen
+    }
+    final mid = top();
+    await tester.pumpAndSettle();
+    expect(mid, greaterThan(from + 5), reason: 'moving down');
+    expect(mid, lessThan(top() - 5), reason: 'not there yet: it slides');
 
     // One indicator slides between the tabs (no per-tab fade that made the bar blink)
     expect(find.byKey(const Key('section-indicator')), findsOneWidget);
 
-    // Closed, a tab opens the sheet to that section's height (was the previous one's)
-    for (final s in ['map', 'tools']) {
+    // Closed, a tab opens the sheet to that section's height
+    for (final s in ['map', 'tools', 'terrain']) {
       await tester.tap(find.byKey(const Key('sheet-grabber')));
       await tester.pumpAndSettle();
-      await tab(s);
-      expect(gap(), inInclusiveRange(0, 80), reason: 'opened to fit $s');
+      await fitsThrough([s]);
     }
 
-    // Terrain is taller than the 90% limit: it scrolls, and the tabs stay on screen
-    await tab('terrain');
+    // Terrain scrolls under the tabs, which stay on screen
     await tester.drag(find.text('CONTOURS CONFIG').hitTestable().first, const Offset(0, -400), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(gap(), inInclusiveRange(0, 80), reason: 'scrolled to the end');
     expect(find.byKey(const Key('section-tools')).hitTestable(), findsOneWidget, reason: 'tabs still there');
-    await tab('tools');
+    await fitsThrough(['tools']);
     expect(find.text('Navigator').hitTestable(), findsOneWidget);
-    expect(gap(), inInclusiveRange(0, 80));
+
+    // In 3D, switching Contours off hides their settings: the sheet follows, no white space
+    await tab('map');
+    await tester.tap(find.byKey(const Key('view-3d')));
+    await tester.pumpAndSettle();
+    await tab('terrain');
+    await tester.pump(const Duration(seconds: 2)); // well after the switch has settled
+    final tall = top();
+    await tester.tap(find.byKey(const Key('contours-toggle')));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final sliding = top();
+    await tester.pumpAndSettle();
+    expect(find.text('Opacity Contours'), findsNothing);
+    expect(gap(), inInclusiveRange(0, 80), reason: 'fits the shorter Terrain, no white space');
+    expect(sliding, greaterThan(tall + 5), reason: 'moving down');
+    expect(sliding, lessThan(top() - 5), reason: 'it slides, no jump');
+    await tester.tap(find.byKey(const Key('contours-toggle')));
+    await tester.pumpAndSettle();
+    expect(gap(), lessThanOrEqualTo(80));
+
+    // Partly open (dragged down a little): a switch still fits the section
+    await tester.drag(find.byKey(const Key('section-tools')), const Offset(0, 120));
+    await tester.pump(const Duration(milliseconds: 30));
+    await tester.pumpAndSettle();
+    await fitsThrough(['map', 'terrain', 'tools']);
     expect(tester.takeException(), isNull);
   });
 }

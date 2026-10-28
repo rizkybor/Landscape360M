@@ -20,7 +20,9 @@ spesifikasi di `docs/flutter-spec.md`.
 | 7b Marked Locations | Selesai: penanda ikon kategori + nama, kartu, daftar Mine/Shared/All, cari, tambah/edit (pilih di peta, pusat peta, GPS), hapus, GPX, berbagi ke akun (Recent + cari) dan sebagai link. Menunggu uji di HP |
 | 7c Marked Areas | Selesai: gambar poligon (Undo, Done), luas & keliling, warna, catatan, edit/redraw, hapus, mode fokus (masker gelap, fit ke area), share link `?area=` (dibuka tanpa login). Menunggu uji di HP |
 | 7d Peta offline | Selesai: pilih area dengan bingkai, perkiraan ukuran dan batas plan sama dengan web, unduh dengan progres (Mapbox TileStore: style, tile, elevasi), daftar, unduh ulang di HP lain, hapus. Diuji di simulator tanpa jaringan. Menunggu uji di HP |
-| 7e–10 | Belum |
+| 7e Basemap kustom | Selesai: daftar basemap Enterprise dari web, nyala/mati (tersinkron), opacity, zoom, hapus; gambar disimpan di HP sehingga tampil tanpa sinyal. Unggah tetap di web. Menunggu uji di HP |
+| 7f Ekspor laporan | Selesai: PNG / JPG / PDF seperti web (header, peta + titik bernomor, info peta, tabel titik, profil elevasi, marked locations terlihat, footer halaman), dibagikan lewat lembar berbagi. Menunggu uji di HP |
+| 8–10 | Belum |
 
 ## Menjalankan
 

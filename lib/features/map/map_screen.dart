@@ -23,6 +23,7 @@ import '../../domain/util/js_compat.dart';
 import '../areas/area_layer.dart';
 import '../areas/area_panel.dart';
 import '../areas/area_state.dart';
+import '../basemaps/basemap_state.dart';
 import '../marked/marked_layer.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
@@ -31,6 +32,7 @@ import '../navigator/navigator_panel.dart';
 import '../navigator/navigator_state.dart';
 import '../offline/offline_state.dart';
 import '../offline/offline_ui.dart';
+import '../report/report_export.dart';
 import '../sos/sos_alerts.dart';
 import '../sos/sos_button.dart';
 import '../sos/sos_state.dart';
@@ -66,9 +68,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   double _headerHeight = mapSheetPeekHeight;
   double _bodyVisibility = 0;
 
-  /// Opening for a tapped section: until its height is known, the sheet aims for it
+  /// A section was chosen: until its height is known, the sheet moves to fit it
   bool _opening = false;
   Timer? _openingTimer;
+
+  /// While moving to a shorter section, the old height stays allowed, so the sheet slides
+  /// down instead of being cut to the new height at once
+  double? _heldSize;
 
   @override
   void initState() {
@@ -90,11 +96,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   double _peek(BuildContext context) =>
       ((_headerHeight + MediaQuery.paddingOf(context).bottom) / MediaQuery.sizeOf(context).height).clamp(0.08, 0.4);
 
-  /// Highest the sheet may open: as tall as its content, at most 90% of the screen
-  double _maxSize(double screen, double peek) {
+  /// Height that fits the current section: as tall as its content, at most 90% of the screen
+  double _fitSize(double screen, double peek) {
     final content = _contentHeight;
-    if (content == null) return peek;
-    return (content / screen).clamp(peek, 0.9);
+    return content == null ? peek : (content / screen).clamp(peek, 0.9);
+  }
+
+  /// Highest the sheet may open: the fitting height (the old one too while sliding down)
+  double _maxSize(double screen, double peek) {
+    final fit = _fitSize(screen, peek);
+    final held = _heldSize;
+    return held != null && held > fit ? held : fit;
   }
 
   void _onSheetMoved() {
@@ -115,34 +127,47 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _onContentHeight(double height) {
     if (!mounted || height == _contentHeight) return;
+    // Open and the section itself changed (e.g. Contours switched off): it keeps fitting,
+    // sliding from the current height like a section switch
+    if (!_opening && _sheet.isAttached && _bodyVisibility > 0) {
+      // Only when it was showing the whole section; a sheet pulled half down stays there
+      final screen = MediaQuery.sizeOf(context).height;
+      if (_sheet.size >= _fitSize(screen, _peek(context)) - 0.01) _holdWhileFitting();
+    }
     setState(() => _contentHeight = height);
-    // After the rebuild, when the sheet allows the new size. An open sheet keeps its height
-    // for a taller section (it scrolls) and follows a shorter one down, frame by frame with
-    // its AnimatedSize, so there is no gap and no restarted animation (jitter).
+    // Slide to the new height once known (after the rebuild)
+    if (!_opening) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_sheet.isAttached) return;
-      final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
-      if (_opening) {
-        _sheet.animateTo(max, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
-      } else if (_sheet.size > max + 0.001) {
-        _sheet.jumpTo(max);
-      }
+      if (mounted && _sheet.isAttached && _opening) _fitSection();
     });
   }
 
-  /// Tapping a section tab while the sheet is closed opens it, so the section shows
-  void _onSectionChanged() {
-    if (!_sheet.isAttached || _bodyVisibility > 0) return;
-    // The new section's height arrives a frame later; the sheet then retargets to it
+  /// Keeps the current height allowed and aims for the fitting one for a moment
+  void _holdWhileFitting() {
+    setState(() => _heldSize = _sheet.size);
     _opening = true;
     _openingTimer?.cancel();
-    // Its height can arrive while the sheet is still opening, or a moment after
-    _openingTimer = Timer(const Duration(milliseconds: 1500), () => _opening = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_sheet.isAttached) return;
-      final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
-      _sheet.animateTo(max, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+    _openingTimer = Timer(const Duration(milliseconds: 1500), () {
+      _opening = false;
+      if (mounted) setState(() => _heldSize = null);
     });
+  }
+
+  /// Every section shows at its own height: choosing one (sheet open or closed) slides the
+  /// sheet to fit it, the same way each time
+  void _onSectionChanged() {
+    if (!_sheet.isAttached) return;
+    // The new section's height arrives a frame or more later; the sheet retargets each time.
+    // Meanwhile the current height stays allowed so a shorter section is reached by sliding.
+    _holdWhileFitting();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _sheet.isAttached) _fitSection();
+    });
+  }
+
+  void _fitSection() {
+    final fit = _fitSize(MediaQuery.sizeOf(context).height, _peek(context));
+    _sheet.animateTo(fit, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
   }
 
   List<double> _snaps(double peek, double max) => {peek, if (max > 0.6) 0.5, max}.toList()..sort();
@@ -366,6 +391,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   PoiLayer? _poiLayer;
   MarkedLayer? _markedLayer;
   AreaLayer? _areaLayer;
+  BasemapLayer? _basemapLayer;
   SharedLinkLayer? _linkLayer;
   late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
@@ -401,6 +427,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   void initState() {
     super.initState();
     _links.start();
+    _wakeChrome();
     unawaited(
       _prefs.getBool(compassHintDismissedKey).then((v) => _hintUsed = v ?? false, onError: (_) => _hintUsed = false),
     );
@@ -418,6 +445,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   void dispose() {
     _compassSub?.cancel();
     _links.dispose();
+    _chromeTimer?.cancel();
     _hintTimer?.cancel();
     _layers?.dispose();
     _settle?.cancel();
@@ -639,6 +667,10 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       final areas = _areaLayer ??= AreaLayer(map);
       await areas.install();
       await _showAreas();
+      // Custom basemaps under the areas, markers and lines
+      final basemaps = _basemapLayer ??= BasemapLayer(map);
+      basemaps.reset();
+      await basemaps.show(ref.read(basemapsProvider), below: areaFillLayer);
       final marked = _markedLayer ??= MarkedLayer(map, scale);
       await marked.install();
       await marked.show(ref.read(markedProvider));
@@ -706,7 +738,37 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     _layers?.onMapIdle(ref.read(mapSettingsProvider));
   }
 
+  // The coordinate card and the right-hand buttons fade while the map is still and come back
+  // as soon as it moves or one of them is touched (S.O.S always stays)
+  static const _chromeIdle = Duration(milliseconds: 2500);
+  static const _chromeFaded = 0.3;
+  bool _chromeAwake = true;
+  Timer? _chromeTimer;
+
+  void _wakeChrome() {
+    if (!_chromeAwake) setState(() => _chromeAwake = true);
+    _chromeTimer?.cancel();
+    _chromeTimer = Timer(_chromeIdle, () {
+      if (mounted) setState(() => _chromeAwake = false);
+    });
+  }
+
+  /// [child] faded while the map is still; a touch on it wakes it (and still taps through)
+  Widget _chrome({required Widget child, bool keepAwake = false}) {
+    final awake = _chromeAwake || keepAwake;
+    return Listener(
+      onPointerDown: (_) => _wakeChrome(),
+      child: AnimatedOpacity(
+        opacity: awake ? 1 : _chromeFaded,
+        duration: const Duration(milliseconds: 300),
+        // No frosted blur while faded, so the map behind is really seen
+        child: GlassBlur(enabled: awake, child: child),
+      ),
+    );
+  }
+
   void _onCameraChanged(CameraChangedEventData e) {
+    _wakeChrome();
     _cameraTick.value++;
     _scheduleSettled();
     // Throttled like the web (at most every 100 ms); elevation waits for the map to settle
@@ -932,6 +994,10 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     ref.listen<SharedView?>(sharedLinkProvider, (_, next) => unawaited(_linkLayer?.show(next)));
     ref.listen<MarkedState>(markedProvider, (_, next) => unawaited(_markedLayer?.show(next)));
     ref.listen<AreasState>(areasProvider, (_, _) => unawaited(_showAreas()));
+    ref.listen<BasemapsState>(
+      basemapsProvider,
+      (_, next) => unawaited(_basemapLayer?.show(next, below: areaFillLayer)),
+    );
     ref.listen<SharedView?>(sharedLinkProvider, (_, _) => unawaited(_showAreas()));
     ref.listen<List<(double, double)>?>(fitPointsProvider, (_, points) {
       if (points == null || points.isEmpty || _map == null) return;
@@ -1032,12 +1098,17 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TelemetryCard(
-                telemetry: _telemetry,
-                format: settings.coordFormat,
-                onFormatChanged: ref.read(mapSettingsProvider.notifier).setCoordFormat,
-                expanded: _telemetryOpen,
-                onToggle: () => setState(() => _telemetryOpen = !_telemetryOpen),
+              _chrome(
+                // Opened for its details, it stays
+                keepAwake: _telemetryOpen,
+                child: TelemetryCard(
+                  key: const Key('telemetry-card'),
+                  telemetry: _telemetry,
+                  format: settings.coordFormat,
+                  onFormatChanged: ref.read(mapSettingsProvider.notifier).setCoordFormat,
+                  expanded: _telemetryOpen,
+                  onToggle: () => setState(() => _telemetryOpen = !_telemetryOpen),
+                ),
               ),
               if (ref.watch(weatherShownProvider)) ...[
                 const SizedBox(height: 10),
@@ -1051,41 +1122,58 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
           top: top,
           child: Column(
             children: [
-              MapIconButton(
-                key: const Key('reset-north'),
-                tooltip: 'Reset to north',
-                onPressed: _resetNorth,
-                child: Transform.rotate(
-                  angle: -_telemetry.bearing * math.pi / 180,
-                  child: const CustomPaint(size: Size(18, 24), painter: _NeedlePainter()),
-                ),
-              ),
-              const SizedBox(height: 10),
-              GlassPanel(
-                radius: L360.touch / 2,
+              _chrome(
                 child: Column(
+                  key: const Key('map-buttons'),
                   children: [
-                    _ZoomButton(icon: Icons.add, tooltip: 'Zoom in', onPressed: () => _zoomBy(1)),
-                    Container(width: 24, height: 0.8, color: L360Colors.sand300),
-                    _ZoomButton(icon: Icons.remove, tooltip: 'Zoom out', onPressed: () => _zoomBy(-1)),
+                    MapIconButton(
+                      key: const Key('reset-north'),
+                      tooltip: 'Reset to north',
+                      onPressed: _resetNorth,
+                      child: Transform.rotate(
+                        angle: -_telemetry.bearing * math.pi / 180,
+                        child: const CustomPaint(size: Size(18, 24), painter: _NeedlePainter()),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    GlassPanel(
+                      radius: L360.touch / 2,
+                      child: Column(
+                        children: [
+                          _ZoomButton(icon: Icons.add, tooltip: 'Zoom in', onPressed: () => _zoomBy(1)),
+                          Container(width: 24, height: 0.8, color: L360Colors.sand300),
+                          _ZoomButton(icon: Icons.remove, tooltip: 'Zoom out', onPressed: () => _zoomBy(-1)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    MapIconButton(
+                      key: const Key('locate-me'),
+                      tooltip: 'Go to my location',
+                      onPressed: _locateMe,
+                      child: _locating
+                          ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.near_me, color: L360Colors.forest700),
+                    ),
+                    const SizedBox(height: 10),
+                    MapIconButton(
+                      key: const Key('share-location'),
+                      tooltip: 'Share Location',
+                      onPressed: () => showShareLocationSheet(context, terrainAt: _terrainAt),
+                      child: const Icon(Icons.share_location, color: L360Colors.forest700),
+                    ),
+                    const SizedBox(height: 10),
+                    MapIconButton(
+                      key: const Key('export-report'),
+                      tooltip: 'Export report',
+                      onPressed: () {
+                        final map = _map;
+                        if (map != null) unawaited(showReportExport(context, ref, map, MediaQuery.sizeOf(context)));
+                      },
+                      child: const Icon(Icons.photo_camera_outlined, color: L360Colors.forest700),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 10),
-              MapIconButton(
-                key: const Key('locate-me'),
-                tooltip: 'Go to my location',
-                onPressed: _locateMe,
-                child: _locating
-                    ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.near_me, color: L360Colors.forest700),
-              ),
-              const SizedBox(height: 10),
-              MapIconButton(
-                key: const Key('share-location'),
-                tooltip: 'Share Location',
-                onPressed: () => showShareLocationSheet(context, terrainAt: _terrainAt),
-                child: const Icon(Icons.share_location, color: L360Colors.forest700),
               ),
               const SizedBox(height: 14),
               const SosButton(),

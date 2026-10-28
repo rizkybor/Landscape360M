@@ -138,9 +138,18 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(container.read(mapSettingsProvider).exaggeration, maxExaggeration);
+      // Contours off: their settings hide (like the grid's); the height slider stays
+      expect(find.text('Opacity Contours'), findsOneWidget);
       await tester.tap(find.byKey(const Key('contours-toggle')));
       await tester.pumpAndSettle();
       expect(container.read(mapSettingsProvider).showContours, isFalse);
+      expect(find.text('Opacity Contours'), findsNothing);
+      expect(find.byKey(const Key('contour-interval')), findsNothing);
+      expect(find.text('12.5m'), findsNothing);
+      expect(find.byKey(const Key('exaggeration')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('contours-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('Opacity Contours'), findsOneWidget);
     });
 
     testWidgets('tool tiles are equal squares and the shorter last row is centered', (tester) async {
@@ -161,7 +170,7 @@ void main() {
       expect(rects[4].top - rects[0].bottom, closeTo(10, 0.01));
     });
 
-    testWidgets('header offers guide, weather, search and signing in; tools not built yet say so', (tester) async {
+    testWidgets('header offers guide, weather, search and signing in; every tool is there', (tester) async {
       await pump(tester);
       // No app sharing in the native app
       expect(find.byKey(const Key('share-app')), findsNothing);
@@ -170,21 +179,16 @@ void main() {
       expect(find.byType(BrandName), findsOneWidget);
       expect(find.byTooltip('Sign in'), findsOneWidget);
       // Same tools as the web's phone layout
-      for (final name in ['Navigator', 'Route', 'Track', 'POIs', 'Marked', 'Areas']) {
+      for (final name in ['Navigator', 'Route', 'Track', 'POIs', 'Marked', 'Areas', 'Basemaps']) {
         expect(
           tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
           isTrue,
         );
       }
-      for (final name in ['Basemaps']) {
-        expect(
-          tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
-          isFalse,
-        );
-      }
+      // Every tool of the web's phone layout is in the app; signed out, Basemaps asks to sign in
       await tester.tap(find.byKey(const Key('tool-Basemaps')));
       await tester.pump();
-      expect(find.text('Basemaps is coming to the app soon.'), findsOneWidget);
+      expect(find.text('Sign in to use your custom basemaps.'), findsOneWidget);
       await tester.tap(find.byKey(const Key('guide')));
       await tester.pumpAndSettle();
       expect(find.text('Quick Start Guide'), findsOneWidget);

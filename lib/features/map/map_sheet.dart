@@ -16,6 +16,8 @@ import '../../domain/map/map_settings.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/terrain/contours.dart';
 import '../areas/area_state.dart';
+import '../basemaps/basemap_sheet.dart';
+import '../basemaps/basemap_state.dart';
 import '../guide/quick_guide.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
@@ -183,18 +185,14 @@ class _MapSheetState extends ConsumerState<MapSheet> {
                                 const Divider(),
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                                  child: AnimatedSize(
-                                    duration: const Duration(milliseconds: 200),
-                                    curve: Curves.easeOut,
-                                    alignment: Alignment.topCenter,
-                                    child: KeyedSubtree(
-                                      key: ValueKey(_section),
-                                      child: switch (_section) {
-                                        _Section.tools => const _ToolsSection(),
-                                        _Section.map => const _MapSection(),
-                                        _Section.terrain => const _TerrainSection(),
-                                      },
-                                    ),
+                                  // The section changes at once; the sheet itself slides to the new height
+                                  child: KeyedSubtree(
+                                    key: ValueKey(_section),
+                                    child: switch (_section) {
+                                      _Section.tools => const _ToolsSection(),
+                                      _Section.map => const _MapSection(),
+                                      _Section.terrain => const _TerrainSection(),
+                                    },
                                   ),
                                 ),
                                 const _Footer(),
@@ -388,9 +386,9 @@ class _SectionTabs extends StatelessWidget {
                   child: GestureDetector(
                     key: Key('section-${section.name}'),
                     behavior: HitTestBehavior.opaque,
+                    // The chosen tab again still counts: closed, it opens the sheet
                     onTap: () {
-                      if (section == value) return;
-                      HapticFeedback.selectionClick();
+                      if (section != value) HapticFeedback.selectionClick();
                       onChanged(section);
                     },
                     child: SizedBox(
@@ -430,14 +428,14 @@ class _ToolsSection extends ConsumerWidget {
   const _ToolsSection();
 
   // Same tools, order and short names as the web's phone layout (ControlPanel.tsx)
-  static const tools = [
+  static const List<(IconData, String, int?)> tools = [
     (Icons.straighten, 'Navigator', null),
     (Icons.alt_route, 'Route', null),
     (Icons.place_outlined, 'POIs', null),
     (Icons.directions_walk, 'Track', null),
     (Icons.pin_drop_outlined, 'Marked', null),
     (Icons.hexagon_outlined, 'Areas', null),
-    (Icons.layers_outlined, 'Basemaps', 7),
+    (Icons.layers_outlined, 'Basemaps', null),
   ];
 
   // One panel at a time: opening Route, Navigator or Track closes the others (a recording
@@ -496,6 +494,16 @@ class _ToolsSection extends ConsumerWidget {
     unawaited(showMarkedSheet(context, markedHost(ref)));
   }
 
+  static void _openBasemaps(BuildContext context, WidgetRef ref) {
+    if (ref.read(authUserIdProvider).value == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Sign in to use your custom basemaps.')));
+      return;
+    }
+    unawaited(showBasemapSheet(context));
+  }
+
   static void _toggleAreas(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
       ScaffoldMessenger.of(context)
@@ -541,6 +549,7 @@ class _ToolsSection extends ConsumerWidget {
                   'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
                   'POIs' => ref.watch(mapSettingsProvider.select((s) => s.showPois)),
                   'Marked' => ref.watch(markedProvider.select((s) => s.picking)),
+                  'Basemaps' => ref.watch(basemapsProvider.select((s) => s.basemaps.any((b) => b.active))),
                   'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
                   _ => false,
                 },
@@ -550,6 +559,7 @@ class _ToolsSection extends ConsumerWidget {
                   'Track' => () => _toggleTrack(context, ref),
                   'Marked' => () => _openMarked(context, ref),
                   'Areas' => () => _toggleAreas(context, ref),
+                  'Basemaps' => () => _openBasemaps(context, ref),
                   // A map layer that stays on (remembered); switching it on lowers the sheet
                   'POIs' =>
                     () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
@@ -876,30 +886,33 @@ class _TerrainSection extends ConsumerWidget {
               value: s.showContours,
               onChanged: terrainOn ? c.setShowContours : null,
             ),
-            _SliderRow(
-              label: 'Opacity Contours',
-              valueLabel: '${(s.contourOpacity * 100).round()}%',
-              value: s.contourOpacity,
-              min: 0,
-              max: 1,
-              divisions: 100,
-              onChanged: terrainOn && s.showContours ? c.setContourOpacity : null,
-            ),
-            _SliderRow(
-              key: const Key('contour-interval'),
-              label: 'Contour Interval',
-              valueLabel: '${_trim(s.contourInterval)}m',
-              value: s.contourInterval,
-              min: minContourInterval,
-              max: maxContourInterval,
-              divisions: ((maxContourInterval - minContourInterval) / contourIntervalStep).round(),
-              onChanged: terrainOn && s.showContours ? c.setContourInterval : null,
-            ),
-            _ChoiceRow<double>(
-              options: [for (final v in contourIntervalPresets) (v, '${_trim(v)}m')],
-              selected: s.contourInterval,
-              onSelected: terrainOn && s.showContours ? c.setContourInterval : null,
-            ),
+            // Its settings show only while contours are on (like the grid's)
+            if (s.showContours) ...[
+              _SliderRow(
+                label: 'Opacity Contours',
+                valueLabel: '${(s.contourOpacity * 100).round()}%',
+                value: s.contourOpacity,
+                min: 0,
+                max: 1,
+                divisions: 100,
+                onChanged: terrainOn && s.showContours ? c.setContourOpacity : null,
+              ),
+              _SliderRow(
+                key: const Key('contour-interval'),
+                label: 'Contour Interval',
+                valueLabel: '${_trim(s.contourInterval)}m',
+                value: s.contourInterval,
+                min: minContourInterval,
+                max: maxContourInterval,
+                divisions: ((maxContourInterval - minContourInterval) / contourIntervalStep).round(),
+                onChanged: terrainOn && s.showContours ? c.setContourInterval : null,
+              ),
+              _ChoiceRow<double>(
+                options: [for (final v in contourIntervalPresets) (v, '${_trim(v)}m')],
+                selected: s.contourInterval,
+                onSelected: terrainOn && s.showContours ? c.setContourInterval : null,
+              ),
+            ],
             _SliderRow(
               key: const Key('exaggeration'),
               label: 'Exaggeration (Height)',

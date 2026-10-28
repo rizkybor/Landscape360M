@@ -6,6 +6,19 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 
+/// Turns the frosted blur of the [GlassPanel]s below it on or off. Off while the map's
+/// controls are faded: a blur stays visible however transparent the panel is.
+class GlassBlur extends InheritedWidget {
+  const GlassBlur({super.key, required this.enabled, required super.child});
+
+  final bool enabled;
+
+  static bool of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassBlur>()?.enabled ?? true;
+
+  @override
+  bool updateShouldNotify(GlassBlur old) => old.enabled != enabled;
+}
+
 /// Frosted panel that floats over the map
 class GlassPanel extends StatelessWidget {
   const GlassPanel({super.key, required this.child, this.padding = EdgeInsets.zero, this.radius = L360.radius});
@@ -15,23 +28,25 @@ class GlassPanel extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: L360.shadow),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.82),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 0.8),
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
+  Widget build(BuildContext context) {
+    final face = DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 0.8),
       ),
-    ),
-  );
+      child: Padding(padding: padding, child: child),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: L360.shadow),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: GlassBlur.of(context)
+            ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: face)
+            : face,
+      ),
+    );
+  }
 }
 
 /// Round frosted map button (44 pt), with a light tap haptic
