@@ -94,4 +94,70 @@ void main() {
     await tester.pumpAndSettle();
     expect(gapBelowFooter(), lessThan(80));
   });
+
+  testWidgets('switching sections fits the sheet to each, and the tabs never scroll away', (tester) async {
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+    tester.view.physicalSize = const Size(1170, 2532); // iPhone 13
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(
+            const AppConfig(
+              flavor: 'dev',
+              supabaseUrl: 'https://x.supabase.co',
+              supabaseAnonKey: 'sb_publishable_x',
+              mapboxPublicToken: '',
+              apiBaseUrl: 'https://landscape360.jcdigital.co.id',
+            ),
+          ),
+          authUserIdProvider.overrideWith((ref) => Stream.value(null)),
+          profileProvider.overrideWith((ref) async => null),
+        ],
+        child: MaterialApp(theme: buildAppTheme(), home: const MapScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    const screen = 2532 / 3;
+    double gap() => screen - tester.getBottomLeft(find.textContaining('Powered by')).dy;
+    Future<void> tab(String s) async {
+      await tester.tap(find.byKey(Key('section-$s')));
+      await tester.pumpAndSettle();
+    }
+
+    // Open on Tools, then a taller section: the sheet keeps its height and the section
+    // scrolls; back to the shorter one, the sheet comes down to it (no empty space)
+    await tester.drag(find.byKey(const Key('section-tools')), const Offset(0, -2000));
+    await tester.pumpAndSettle();
+    expect(gap(), inInclusiveRange(0, 80));
+    final openTop = tester.getTopLeft(find.byKey(const Key('section-tools'))).dy;
+    await tab('map');
+    expect(tester.getTopLeft(find.byKey(const Key('section-tools'))).dy, openTop, reason: 'same height');
+    await tab('tools');
+    expect(gap(), inInclusiveRange(0, 80), reason: 'back to the shorter one, no empty space');
+
+    // One indicator slides between the tabs (no per-tab fade that made the bar blink)
+    expect(find.byKey(const Key('section-indicator')), findsOneWidget);
+
+    // Closed, a tab opens the sheet to that section's height (was the previous one's)
+    for (final s in ['map', 'tools']) {
+      await tester.tap(find.byKey(const Key('sheet-grabber')));
+      await tester.pumpAndSettle();
+      await tab(s);
+      expect(gap(), inInclusiveRange(0, 80), reason: 'opened to fit $s');
+    }
+
+    // Terrain is taller than the 90% limit: it scrolls, and the tabs stay on screen
+    await tab('terrain');
+    await tester.drag(find.text('CONTOURS CONFIG').hitTestable().first, const Offset(0, -400), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(gap(), inInclusiveRange(0, 80), reason: 'scrolled to the end');
+    expect(find.byKey(const Key('section-tools')).hitTestable(), findsOneWidget, reason: 'tabs still there');
+    await tab('tools');
+    expect(find.text('Navigator').hitTestable(), findsOneWidget);
+    expect(gap(), inInclusiveRange(0, 80));
+    expect(tester.takeException(), isNull);
+  });
 }

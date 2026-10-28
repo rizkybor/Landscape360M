@@ -3,6 +3,7 @@ import * as S from 'WEB/src/utils/surveyUtils';
 import * as A from 'WEB/src/utils/markedAreas';
 import * as T from 'WEB/src/utils/trackRecorderGeo';
 import * as L from 'WEB/src/lib/shareLocation';
+import * as Tiles from 'WEB/src/utils/tileUtils';
 
 type LL = [number, number];
 const pairs: [number, number, number, number][] = [
@@ -85,4 +86,13 @@ const share = {
   urlNeg: L.sharedLocationUrl(-0.000004, -0.000006),
 };
 
-console.log(JSON.stringify({ geodesic, az, snap, lines, handles, dms, utm, fmt, areas, hav, share }, null, 1));
+// Offline maps: tiles a download covers (RegionDrawingOverlay.tsx)
+const tileBoxes: [Tiles.Bounds, number, number][] = [
+  [{ west: 106.95, south: -6.82, east: 107.02, north: -6.75 }, 13, 15],
+  [{ west: 110.40, south: -7.56, east: 110.47, north: -7.50 }, 12, 14],
+  [{ west: 106.8, south: -6.25, east: 106.9, north: -6.15 }, 14, 16],
+  [{ west: -0.1, south: 51.45, east: 0.05, north: 51.55 }, 10, 12],
+];
+const tiles = tileBoxes.map(([b, min, max]) => ({ bounds: b, min, max, count: Tiles.getTilesInBounds(b, min, max).length }));
+
+console.log(JSON.stringify({ geodesic, az, snap, lines, handles, dms, utm, fmt, areas, hav, share, tiles }, null, 1));

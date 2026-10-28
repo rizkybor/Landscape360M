@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:landscape360/domain/geo/spherical.dart';
+import 'package:landscape360/domain/map/offline_regions.dart';
 import 'package:landscape360/domain/marked/marked_areas.dart';
 import 'package:landscape360/domain/share/share_location.dart';
 import 'package:landscape360/domain/survey/survey_utils.dart';
@@ -132,5 +133,12 @@ void main() {
     final s = ref['share'] as Map<String, dynamic>;
     expect(sharedLocationUrl(-6.789912, 106.983201), s['url']);
     expect(sharedLocationUrl(-0.000004, -0.000006), s['urlNeg']);
+  });
+
+  test('offline map tile counts match the web', () {
+    for (final t in rows('tiles')) {
+      final b = OfflineBounds.fromJson(t['bounds'] as Map<String, dynamic>);
+      expect(tileCount(b, t['min'] as int, t['max'] as int), t['count'], reason: '${t['bounds']}');
+    }
   });
 }

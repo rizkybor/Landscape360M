@@ -20,12 +20,17 @@ import '../../domain/route/route_planner.dart';
 import '../../domain/survey/survey_model.dart';
 import '../../domain/tracks/track_recorder_geo.dart';
 import '../../domain/util/js_compat.dart';
+import '../areas/area_layer.dart';
+import '../areas/area_panel.dart';
+import '../areas/area_state.dart';
 import '../marked/marked_layer.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
 import '../navigator/navigator_overlay.dart';
 import '../navigator/navigator_panel.dart';
 import '../navigator/navigator_state.dart';
+import '../offline/offline_state.dart';
+import '../offline/offline_ui.dart';
 import '../sos/sos_alerts.dart';
 import '../sos/sos_button.dart';
 import '../sos/sos_state.dart';
@@ -61,6 +66,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   double _headerHeight = mapSheetPeekHeight;
   double _bodyVisibility = 0;
 
+  /// Opening for a tapped section: until its height is known, the sheet aims for it
+  bool _opening = false;
+  Timer? _openingTimer;
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +78,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   void dispose() {
+    _openingTimer?.cancel();
     _sheet
       ..removeListener(_onSheetMoved)
       ..dispose();
@@ -106,16 +116,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onContentHeight(double height) {
     if (!mounted || height == _contentHeight) return;
     setState(() => _contentHeight = height);
-    // A shorter section while the sheet is open: settle on the new top instead of leaving a gap
-    final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
-    if (_sheet.isAttached && _sheet.size > max + 0.001) {
-      _sheet.animateTo(max, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
-    }
+    // After the rebuild, when the sheet allows the new size. An open sheet keeps its height
+    // for a taller section (it scrolls) and follows a shorter one down, frame by frame with
+    // its AnimatedSize, so there is no gap and no restarted animation (jitter).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheet.isAttached) return;
+      final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
+      if (_opening) {
+        _sheet.animateTo(max, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
+      } else if (_sheet.size > max + 0.001) {
+        _sheet.jumpTo(max);
+      }
+    });
   }
 
   /// Tapping a section tab while the sheet is closed opens it, so the section shows
   void _onSectionChanged() {
     if (!_sheet.isAttached || _bodyVisibility > 0) return;
+    // The new section's height arrives a frame later; the sheet then retargets to it
+    _opening = true;
+    _openingTimer?.cancel();
+    // Its height can arrive while the sheet is still opening, or a moment after
+    _openingTimer = Timer(const Duration(milliseconds: 1500), () => _opening = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_sheet.isAttached) return;
       final max = _maxSize(MediaQuery.sizeOf(context).height, _peek(context));
@@ -128,6 +150,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Header dragged: the sheet follows the finger
   void _onHandleDrag(double dy) {
     if (!_sheet.isAttached) return;
+    _opening = false; // the user moves the sheet now
     final screen = MediaQuery.sizeOf(context).height;
     final peek = _peek(context);
     _sheet.jumpTo((_sheet.size - dy / screen).clamp(peek, _maxSize(screen, peek)));
@@ -154,6 +177,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Grabber tapped: open when closed, close when open
   void _onGrabberTap() {
     if (!_sheet.isAttached) return;
+    _opening = false;
     final screen = MediaQuery.sizeOf(context).height;
     final peek = _peek(context);
     final target = _bodyVisibility > 0 ? peek : _maxSize(screen, peek);
@@ -182,7 +206,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ..listen(routePlannerProvider.select((s) => s.enabled), lowerSheet)
       ..listen(navigatorProvider.select((s) => s.enabled), lowerSheet)
       ..listen(trackRecorderProvider.select((s) => s.panelOpen), lowerSheet)
-      ..listen(mapSettingsProvider.select((s) => s.showPois), lowerSheet);
+      ..listen(mapSettingsProvider.select((s) => s.showPois), lowerSheet)
+      ..listen(areasProvider.select((s) => s.panelOpen || s.drawing), lowerSheet)
+      ..listen(offlineProvider.select((s) => s.framing), lowerSheet);
     final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
@@ -191,6 +217,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final sharedLink = ref.watch(sharedLinkProvider) != null;
     final poiOpen = ref.watch(selectedPoiProvider) != null;
     final picking = ref.watch(markedProvider.select((s) => s.picking));
+    final areaDrawing = ref.watch(areasProvider.select((s) => s.drawing));
+    final areaPanel = ref.watch(areasProvider.select((s) => s.panelOpen));
+    final areaFocus = ref.watch(areasProvider.select((s) => s.focusId != null));
+    // Downloads keep going while the list is closed
+    final framing = ref.watch(offlineProvider.select((s) => s.framing));
+    final size = MediaQuery.sizeOf(context);
+    final top = MediaQuery.paddingOf(context).top;
+    // The part of the map that a new offline area covers, above the download bar
+    final frame = Rect.fromLTRB(20, top + 64, size.width - 20, math.max(top + 160, size.height - sheetInset - 300));
     final markedOpen = ref.watch(markedProvider.select((s) => s.selectedId != null));
     // A position picked on the map goes back into the form that asked for it
     ref.listen<PickedPoint?>(markedProvider.select((s) => s.picked), (_, p) {
@@ -223,6 +258,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         body: Stack(
           children: [
             Positioned.fill(child: hasToken ? _LiveMap(sheetInset: sheetInset) : const _NoMapToken()),
+            if (framing) Positioned.fill(child: OfflineFrame(frame: frame)),
             DraggableScrollableSheet(
               controller: _sheet,
               initialChildSize: peek,
@@ -256,6 +292,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     if (sharedLink) ...[const SharedLinkCard(), const SizedBox(height: 10)],
                     if (poiOpen) ...[const PoiCard(), const SizedBox(height: 10)],
                     if (picking) ...[const PickingBar(), const SizedBox(height: 10)],
+                    if (areaFocus && !areaPanel && !areaDrawing) ...[const AreaFocusPill(), const SizedBox(height: 10)],
+                    if (framing)
+                      OfflineBar(frame: frame)
+                    else if (areaDrawing)
+                      const AreaDrawingBar()
+                    else if (areaPanel)
+                      const AreaPanel(),
                     if (markedOpen && !picking) ...[
                       MarkedCard(
                         onOpenList: () =>
@@ -322,6 +365,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   SosAlertsLayer? _sosLayer;
   PoiLayer? _poiLayer;
   MarkedLayer? _markedLayer;
+  AreaLayer? _areaLayer;
   SharedLinkLayer? _linkLayer;
   late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
@@ -425,8 +469,35 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     }
   }
 
+  /// My areas, the shape being drawn, and an area opened from a link (in focus)
+  Future<void> _showAreas() async {
+    final link = ref.read(sharedLinkProvider);
+    final linked = link is SharedArea && link.area != null ? (ring: link.area!.ring, color: link.area!.color) : null;
+    await _areaLayer?.show(ref.read(areasProvider), linked: linked);
+  }
+
+  /// Points in view above the panels (fitBounds, max zoom 17)
+  Future<void> _fitPoints(List<(double, double)> points) async {
+    final map = _map;
+    if (map == null) return;
+    final camera = await map.cameraForCoordinates(
+      [for (final (lng, lat) in points) Point(coordinates: Position(lng, lat))],
+      MbxEdgeInsets(top: 120, left: 40, bottom: _sheetInset + 260, right: 80),
+      null,
+      null,
+    );
+    if ((camera.zoom ?? 0) > 17) camera.zoom = 17;
+    await map.flyTo(camera, MapAnimationOptions(duration: 1200));
+  }
+
   /// A tap for the open drawing tool; false when none is open
   bool _toolTap(double lng, double lat) {
+    // Drawing a marked area: each tap adds a corner
+    if (ref.read(areasProvider).drawing) {
+      HapticFeedback.lightImpact();
+      ref.read(areasProvider.notifier).addPoint((lng, lat));
+      return true;
+    }
     // Picking a position for the Marked Locations form: this tap sets it (with the terrain height)
     if (ref.read(markedProvider).picking) {
       HapticFeedback.lightImpact();
@@ -456,6 +527,14 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   Future<void> _onMapCreated(MapboxMap map) async {
     setState(() => _map = map); // the survey overlay needs the map
     debugLiveMap = map;
+    ref.read(mapProjectionProvider.notifier).set((x, y) async {
+      try {
+        final p = await map.coordinateForPixel(ScreenCoordinate(x: x, y: y));
+        return (p.coordinates.lng.toDouble(), p.coordinates.lat.toDouble());
+      } on Object {
+        return null;
+      }
+    });
     final s = ref.read(mapSettingsProvider);
     await map.setCamera(
       CameraOptions(
@@ -490,6 +569,21 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
         ref.read(selectedPoiProvider.notifier).select(poi);
       }),
       interactionID: 'poi-tap',
+    );
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: areaFillLayer), (feature, context) {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        HapticFeedback.selectionClick();
+        // Opens the area in its panel (in the spot the other tools' panels use)
+        ref.read(routePlannerProvider.notifier).disable();
+        ref.read(navigatorProvider.notifier).close();
+        ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+        ref.read(areasProvider.notifier)
+          ..select('${feature.properties['id']}')
+          ..setPanelOpen(true);
+      }),
+      interactionID: 'area-tap',
     );
     map.addInteraction(
       TapInteraction(FeaturesetDescriptor(layerId: markedPointsLayer), (feature, context) {
@@ -542,6 +636,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       await layers.install(ref.read(mapSettingsProvider));
       final pois = _poiLayer ??= PoiLayer(map);
       await pois.install(ref.read(poisProvider).value ?? const [], visible: ref.read(mapSettingsProvider).showPois);
+      final areas = _areaLayer ??= AreaLayer(map);
+      await areas.install();
+      await _showAreas();
       final marked = _markedLayer ??= MarkedLayer(map, scale);
       await marked.install();
       await marked.show(ref.read(markedProvider));
@@ -644,6 +741,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     final north = await at(lng, lat + slopeSampleOffsetDeg);
     if (!mounted) return;
     ref.read(mapCenterProvider.notifier).set(lng, lat);
+    ref.read(mapZoomProvider.notifier).set(c.zoom);
     setState(() {
       _telemetry = Telemetry(
         lng: lng,
@@ -833,6 +931,13 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     });
     ref.listen<SharedView?>(sharedLinkProvider, (_, next) => unawaited(_linkLayer?.show(next)));
     ref.listen<MarkedState>(markedProvider, (_, next) => unawaited(_markedLayer?.show(next)));
+    ref.listen<AreasState>(areasProvider, (_, _) => unawaited(_showAreas()));
+    ref.listen<SharedView?>(sharedLinkProvider, (_, _) => unawaited(_showAreas()));
+    ref.listen<List<(double, double)>?>(fitPointsProvider, (_, points) {
+      if (points == null || points.isEmpty || _map == null) return;
+      ref.read(fitPointsProvider.notifier).done();
+      unawaited(_fitPoints(points));
+    });
     ref.listen<SurveyDoc?>(showSurveyProvider, (_, doc) {
       final b = doc?.bounds;
       if (b == null || _map == null) return;

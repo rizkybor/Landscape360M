@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,10 +15,13 @@ import '../../domain/map/grid_dms.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/terrain/contours.dart';
+import '../areas/area_state.dart';
 import '../guide/quick_guide.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
 import '../navigator/navigator_state.dart';
+import '../offline/offline_state.dart';
+import '../offline/offline_ui.dart';
 import '../tracks/track_recorder_state.dart';
 import 'map_settings_controller.dart';
 import 'map_tools_state.dart';
@@ -73,6 +77,29 @@ class MapSheet extends ConsumerStatefulWidget {
 class _MapSheetState extends ConsumerState<MapSheet> {
   _Section _section = _Section.tools;
 
+  // The Map section's pictures are decoded once up front, so they do not show blank for a
+  // frame each time the section opens
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (final image in [
+      ..._MapSection._styleImages.values,
+      'assets/images/view_2d.jpg',
+      'assets/images/view_3d.jpg',
+    ]) {
+      unawaited(precacheImage(AssetImage(image), context));
+    }
+  }
+
+  double? _headerHeight;
+  double? _bodyHeight;
+
+  /// The whole sheet's height (header plus section), once both are measured
+  void _reportHeight() {
+    final h = _headerHeight, b = _bodyHeight;
+    if (h != null && b != null) widget.onContentHeight?.call(h + b);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -83,79 +110,105 @@ class _MapSheetState extends ConsumerState<MapSheet> {
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: SingleChildScrollView(
-          controller: widget.scrollController,
-          // No bounce past the end: the sheet never shows empty space below its content
-          physics: const ClampingScrollPhysics(),
-          child: MeasureSize(
-            onChange: (size) => widget.onContentHeight?.call(size.height),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                MeasureSize(
-                  onChange: (size) => widget.onHeaderHeight?.call(size.height),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onVerticalDragUpdate: widget.onHandleDrag == null ? null : (d) => widget.onHandleDrag!(d.delta.dy),
-                    onVerticalDragEnd: widget.onHandleDragEnd == null
-                        ? null
-                        : (d) => widget.onHandleDragEnd!(d.velocity.pixelsPerSecond.dy),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        GestureDetector(
-                          key: const Key('sheet-grabber'),
-                          behavior: HitTestBehavior.opaque,
-                          onTap: widget.onGrabberTap,
-                          child: const _Grabber(),
-                        ),
-                        const _Header(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                          child: _SectionTabs(
-                            value: _section,
-                            onChanged: (s) {
-                              setState(() => _section = s);
-                              widget.onSectionChanged?.call();
-                            },
+        // The header (grabber, title, section tabs) stays put; only the section scrolls, so
+        // the tabs are always there to switch. When the screen gets shorter than the header
+        // for a moment (keyboard, resize) it is clipped instead of squeezed.
+        child: LayoutBuilder(
+          builder: (context, c) {
+            // Before the header is measured (first frame) leave it room enough
+            final h = math.max(c.maxHeight, _headerHeight ?? 400);
+            return OverflowBox(
+              alignment: Alignment.topCenter,
+              minHeight: h,
+              maxHeight: h,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  MeasureSize(
+                    onChange: (size) {
+                      _headerHeight = size.height;
+                      widget.onHeaderHeight?.call(size.height);
+                      _reportHeight();
+                    },
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onVerticalDragUpdate: widget.onHandleDrag == null
+                          ? null
+                          : (d) => widget.onHandleDrag!(d.delta.dy),
+                      onVerticalDragEnd: widget.onHandleDragEnd == null
+                          ? null
+                          : (d) => widget.onHandleDragEnd!(d.velocity.pixelsPerSecond.dy),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          GestureDetector(
+                            key: const Key('sheet-grabber'),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: widget.onGrabberTap,
+                            child: const _Grabber(),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                IgnorePointer(
-                  ignoring: widget.bodyVisibility < 0.5,
-                  child: Opacity(
-                    opacity: widget.bodyVisibility,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Divider(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                          child: AnimatedSize(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOut,
-                            alignment: Alignment.topCenter,
-                            child: KeyedSubtree(
-                              key: ValueKey(_section),
-                              child: switch (_section) {
-                                _Section.tools => const _ToolsSection(),
-                                _Section.map => const _MapSection(),
-                                _Section.terrain => const _TerrainSection(),
+                          const _Header(),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                            child: _SectionTabs(
+                              value: _section,
+                              onChanged: (s) {
+                                setState(() => _section = s);
+                                widget.onSectionChanged?.call();
                               },
                             ),
                           ),
-                        ),
-                        const _Footer(),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: widget.scrollController,
+                      // No bounce past the end: the sheet never shows empty space below its content
+                      physics: const ClampingScrollPhysics(),
+                      child: MeasureSize(
+                        // The whole sheet's height: header plus this
+                        onChange: (size) {
+                          _bodyHeight = size.height;
+                          _reportHeight();
+                        },
+                        child: IgnorePointer(
+                          ignoring: widget.bodyVisibility < 0.5,
+                          child: Opacity(
+                            opacity: widget.bodyVisibility,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Divider(),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                                  child: AnimatedSize(
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeOut,
+                                    alignment: Alignment.topCenter,
+                                    child: KeyedSubtree(
+                                      key: ValueKey(_section),
+                                      child: switch (_section) {
+                                        _Section.tools => const _ToolsSection(),
+                                        _Section.map => const _MapSection(),
+                                        _Section.terrain => const _TerrainSection(),
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const _Footer(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -297,53 +350,78 @@ class _SectionTabs extends StatelessWidget {
     (_Section.terrain, 'Terrain', Icons.terrain_outlined),
   ];
 
+  static const _duration = Duration(milliseconds: 220);
+
+  // One white pill slides to the chosen tab (each tab fading its own in and out made the
+  // bar blink while both were half visible)
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(3),
-    decoration: BoxDecoration(color: L360Colors.sand100, borderRadius: BorderRadius.circular(12)),
-    child: Row(
-      children: [
-        for (final (section, label, icon) in _items)
-          Expanded(
-            child: GestureDetector(
-              key: Key('section-${section.name}'),
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                if (section == value) return;
-                HapticFeedback.selectionClick();
-                onChanged(section);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                height: 36,
-                decoration: BoxDecoration(
-                  color: section == value ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: section == value
-                      ? const [BoxShadow(color: Color(0x1A000000), blurRadius: 4, offset: Offset(0, 1))]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 16, color: section == value ? L360Colors.forest800 : L360Colors.sand500),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: section == value ? L360Colors.forest800 : L360Colors.sand600,
-                      ),
-                    ),
-                  ],
+  Widget build(BuildContext context) {
+    final index = _items.indexWhere((i) => i.$1 == value);
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: L360Colors.sand100, borderRadius: BorderRadius.circular(12)),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedAlign(
+              key: const Key('section-indicator'),
+              duration: _duration,
+              curve: Curves.easeOutCubic,
+              alignment: Alignment(-1 + index * 1.0, 0),
+              child: FractionallySizedBox(
+                widthFactor: 1 / _items.length,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 4, offset: Offset(0, 1))],
+                  ),
                 ),
               ),
             ),
           ),
-      ],
-    ),
-  );
+          Row(
+            children: [
+              for (final (section, label, icon) in _items)
+                Expanded(
+                  child: GestureDetector(
+                    key: Key('section-${section.name}'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (section == value) return;
+                      HapticFeedback.selectionClick();
+                      onChanged(section);
+                    },
+                    child: SizedBox(
+                      height: 36,
+                      child: TweenAnimationBuilder<double>(
+                        duration: _duration,
+                        tween: Tween(end: section == value ? 1 : 0),
+                        builder: (context, t, _) {
+                          final color = Color.lerp(L360Colors.sand600, L360Colors.forest800, t);
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(icon, size: 16, color: Color.lerp(L360Colors.sand500, L360Colors.forest800, t)),
+                              const SizedBox(width: 6),
+                              Text(
+                                label,
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // --- Tools -----------------------------------------------------------------------------------
@@ -358,7 +436,7 @@ class _ToolsSection extends ConsumerWidget {
     (Icons.place_outlined, 'POIs', null),
     (Icons.directions_walk, 'Track', null),
     (Icons.pin_drop_outlined, 'Marked', null),
-    (Icons.hexagon_outlined, 'Areas', 7),
+    (Icons.hexagon_outlined, 'Areas', null),
     (Icons.layers_outlined, 'Basemaps', 7),
   ];
 
@@ -371,6 +449,7 @@ class _ToolsSection extends ConsumerWidget {
     } else {
       ref.read(navigatorProvider.notifier).close();
       ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      ref.read(areasProvider.notifier).setPanelOpen(false);
       planner.enable();
     }
   }
@@ -382,6 +461,7 @@ class _ToolsSection extends ConsumerWidget {
     } else {
       ref.read(routePlannerProvider.notifier).disable();
       ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      ref.read(areasProvider.notifier).setPanelOpen(false);
       nav.open();
     }
   }
@@ -400,6 +480,7 @@ class _ToolsSection extends ConsumerWidget {
     } else {
       ref.read(routePlannerProvider.notifier).disable();
       ref.read(navigatorProvider.notifier).close();
+      ref.read(areasProvider.notifier).setPanelOpen(false);
       rec.setPanelOpen(true);
     }
   }
@@ -413,6 +494,24 @@ class _ToolsSection extends ConsumerWidget {
       return;
     }
     unawaited(showMarkedSheet(context, markedHost(ref)));
+  }
+
+  static void _toggleAreas(BuildContext context, WidgetRef ref) {
+    if (ref.read(authUserIdProvider).value == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Sign in to draw and save areas.')));
+      return;
+    }
+    final areas = ref.read(areasProvider.notifier);
+    if (ref.read(areasProvider).panelOpen) {
+      areas.setPanelOpen(false);
+    } else {
+      ref.read(routePlannerProvider.notifier).disable();
+      ref.read(navigatorProvider.notifier).close();
+      ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      areas.setPanelOpen(true);
+    }
   }
 
   static const _columns = 4;
@@ -442,6 +541,7 @@ class _ToolsSection extends ConsumerWidget {
                   'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
                   'POIs' => ref.watch(mapSettingsProvider.select((s) => s.showPois)),
                   'Marked' => ref.watch(markedProvider.select((s) => s.picking)),
+                  'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
                   _ => false,
                 },
                 onTap: switch (label) {
@@ -449,6 +549,7 @@ class _ToolsSection extends ConsumerWidget {
                   'Navigator' => () => _toggleNavigator(ref),
                   'Track' => () => _toggleTrack(context, ref),
                   'Marked' => () => _openMarked(context, ref),
+                  'Areas' => () => _toggleAreas(context, ref),
                   // A map layer that stays on (remembered); switching it on lowers the sheet
                   'POIs' =>
                     () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
@@ -610,6 +711,42 @@ class _MapSection extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 20),
+        const SectionLabel('Offline'),
+        Material(
+          color: L360Colors.sand50,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: L360Colors.sand200),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            key: const Key('offline-maps'),
+            leading: const Icon(Icons.download_for_offline_outlined, color: L360Colors.forest700),
+            title: const Text('Offline maps', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Consumer(
+              builder: (context, ref, _) {
+                final o = ref.watch(offlineProvider);
+                final running = o.progress.length;
+                return Text(
+                  running > 0
+                      ? 'Downloading $running area${running == 1 ? '' : 's'}…'
+                      : 'Use the map without signal: ${o.stored.length} area${o.stored.length == 1 ? '' : 's'} on this phone',
+                );
+              },
+            ),
+            trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+            onTap: () {
+              if (ref.read(authUserIdProvider).value == null) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(const SnackBar(content: Text('Sign in to download offline maps.')));
+                return;
+              }
+              unawaited(showOfflineSheet(context));
+            },
+          ),
         ),
       ],
     );

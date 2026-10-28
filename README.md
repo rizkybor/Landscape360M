@@ -18,7 +18,9 @@ spesifikasi di `docs/flutter-spec.md`.
 | 6b S.O.S | Selesai tanpa push: tombol tahan 3 dtk, hitung mundur, layar darurat (DMS/UTM, 112/115, SMS kontak, share, sirene, senter Morse), laporan ke admin tiap 30 dtk lewat antrean offline yang jalan juga di background, panel admin (banner, penanda peta, resolve, hapus). Push notification menunggu Firebase + Apple Developer berbayar. Menunggu uji di HP |
 | 7a POIs, Share Location, link | Selesai: layer POI (warna per kategori, cluster, kartu), tombol POIs diingat, Share Location (WhatsApp / aplikasi lain / copy), penanganan link `?at=` dan `?place=` tanpa login. Link dari luar aplikasi menunggu Fase 8 (domain terverifikasi). Menunggu uji di HP |
 | 7b Marked Locations | Selesai: penanda ikon kategori + nama, kartu, daftar Mine/Shared/All, cari, tambah/edit (pilih di peta, pusat peta, GPS), hapus, GPX, berbagi ke akun (Recent + cari) dan sebagai link. Menunggu uji di HP |
-| 7c–10 | Belum |
+| 7c Marked Areas | Selesai: gambar poligon (Undo, Done), luas & keliling, warna, catatan, edit/redraw, hapus, mode fokus (masker gelap, fit ke area), share link `?area=` (dibuka tanpa login). Menunggu uji di HP |
+| 7d Peta offline | Selesai: pilih area dengan bingkai, perkiraan ukuran dan batas plan sama dengan web, unduh dengan progres (Mapbox TileStore: style, tile, elevasi), daftar, unduh ulang di HP lain, hapus. Diuji di simulator tanpa jaringan. Menunggu uji di HP |
+| 7e–10 | Belum |
 
 ## Menjalankan
 

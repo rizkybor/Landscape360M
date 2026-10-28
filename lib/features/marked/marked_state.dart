@@ -108,7 +108,13 @@ class MarkedController extends Notifier<MarkedState> {
     ref.listen(authUserIdProvider, (_, next) {
       if (!next.hasValue) return;
       final id = next.value;
-      unawaited(Future(() => id == null ? reset() : init(id)));
+      // After build (the first state is in place), and not once the provider is gone
+      unawaited(
+        Future(() {
+          if (!ref.mounted) return;
+          id == null ? reset() : unawaited(init(id));
+        }),
+      );
     }, fireImmediately: true);
     return const MarkedState();
   }

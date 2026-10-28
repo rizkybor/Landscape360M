@@ -198,3 +198,39 @@ Link masuk (`?at=`, `?place=`) baru bisa dibuka langsung dari WhatsApp setelah d
 | 7b.13 | Akun Free: Share tidak ada; di batas 10 lokasi tombol Add mati | Pesan batas plan dan "Hubungi Admin" | | |
 | 7b.14 | Admin: tab All + "Show every account's locations" | Penanda akun lain bercincin abu-abu | | |
 | 7b.15 | Track Recorder → My Tracks → Share (regresi) | Kolom email + tombol Share tampil normal (sebelumnya bisa crash) | | |
+
+## Fase 7c — Marked Areas
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7c.1 | Belum login → Tools → Areas | "Sign in to draw and save areas." | | |
+| 7c.2 | Login → Tools → Areas | Panel "Marked Areas" di atas sheet, jumlah "n / batas plan" (Free 5, Pro 10, Enterprise 20) | | |
+| 7c.3 | Add area → ketuk 4 sudut di peta | Garis putus-putus emas tertutup, titik pertama hijau; bar "4 points · luas" | | |
+| 7c.4 | Undo | Titik terakhir hilang | | |
+| 7c.5 | Done → isi nama, pilih warna, catatan → Save area | Area berwarna tipis dengan garis tepi dan nama; muncul juga di web | | |
+| 7c.6 | Ikon mata (Focus) | Peta menyesuaikan ke area, sekelilingnya gelap; pill "Exit focus" saat panel ditutup | | |
+| 7c.7 | ⋯ → Edit → Redraw | Bisa menggambar ulang dari sudut lama; ukuran diperbarui | | |
+| 7c.8 | Ketuk sebuah area di peta | Panel Areas terbuka dengan area itu disorot | | |
+| 7c.9 | Navigator aktif, ketuk di dalam area | Titik survei ditambahkan (panel area tidak terbuka) | | |
+| 7c.10 | Pro/Enterprise: ⋯ → Share as a link → Create link → WhatsApp / Copy | Pesan berisi luas, keliling dan link `?area=` | | |
+| 7c.11 | Buka link `?area=` di browser | Area tampil dalam mode fokus tanpa login | | |
+| 7c.12 | Turn off link | Link lama: "no longer available" | | |
+| 7c.13 | ⋯ → Delete | Area terhapus (juga di web) | | |
+
+## Fase 7d — Peta offline
+
+Batas sama dengan web (dicek ulang server): Free 1 peta ≤ 1 MB, Pro 3 peta ≤ 10 MB, Enterprise/admin 10 peta ≤ 25 MB. Yang diunduh: zoom saat ini sampai +2 (maks. 16).
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 7d.1 | Sheet → Map → Offline maps (belum login) | "Sign in to download offline maps." | | |
+| 7d.2 | Login → Offline maps | Daftar kosong, "0 of n maps · up to x MB each" | | |
+| 7d.3 | Download an area | Sheet turun, bingkai putih di peta (luar bingkai gelap), bar unduh di bawah | | |
+| 7d.4 | Geser / zoom peta | "Zoom a–b · n tiles · ≈ x MB of y MB" ikut berubah | | |
+| 7d.5 | Area terlalu besar untuk plan | Teks merah, tombol Download mati | | |
+| 7d.6 | Beri nama → Download | Pesan "Downloading…"; Map → Offline maps menunjukkan progres % | | |
+| 7d.7 | Selesai | "On this phone · x MB"; juga tercatat di web (Offline Maps) | | |
+| 7d.8 | **Tutup app, nyalakan mode pesawat, buka app, ke area itu** | **Peta tampil (satelit / jalan), 3D dan kontur jalan, ketinggian di kartu telemetri terisi** | | |
+| 7d.9 | Mode pesawat, geser ke area yang tidak diunduh | Peta kosong di sana (wajar) | | |
+| 7d.10 | Peta yang diunduh di HP / web lain | "Not on this phone" → ⋯ → Download to this phone | | |
+| 7d.11 | ⋯ → Show on map / Delete | Peta ke area itu / terhapus dari HP dan akun | | |

@@ -73,6 +73,28 @@ class MapCenter extends Notifier<({double lng, double lat})> {
 
 final mapCenterProvider = NotifierProvider<MapCenter, ({double lng, double lat})>(MapCenter.new);
 
+/// Zoom of the map, kept with the centre
+class MapZoom extends Notifier<double> {
+  @override
+  double build() => defaultZoom;
+
+  void set(double z) => state = z;
+}
+
+final mapZoomProvider = NotifierProvider<MapZoom, double>(MapZoom.new);
+
+/// Screen point → (lng, lat) on the live map; null until the map is there
+typedef MapProjector = Future<(double, double)?> Function(double x, double y);
+
+class MapProjection extends Notifier<MapProjector?> {
+  @override
+  MapProjector? build() => null;
+
+  void set(MapProjector? p) => state = p;
+}
+
+final mapProjectionProvider = NotifierProvider<MapProjection, MapProjector?>(MapProjection.new);
+
 typedef FlyTarget = ({double lng, double lat, double zoom});
 
 /// A place the map should move to (a search result); the map clears it once there
@@ -85,6 +107,17 @@ class FlyTo extends Notifier<FlyTarget?> {
 }
 
 final flyToProvider = NotifierProvider<FlyTo, FlyTarget?>(FlyTo.new);
+
+/// Points the map should fit on screen (an area in focus); the map clears it once there
+class FitPoints extends Notifier<List<(double, double)>?> {
+  @override
+  List<(double, double)>? build() => null;
+
+  void go(List<(double, double)> lngLats) => state = lngLats;
+  void done() => state = null;
+}
+
+final fitPointsProvider = NotifierProvider<FitPoints, List<(double, double)>?>(FitPoints.new);
 
 class RoutePlannerState {
   const RoutePlannerState({

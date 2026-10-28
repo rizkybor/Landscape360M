@@ -133,7 +133,7 @@ class SosController extends Notifier<SosState> {
       if (state.phase == SosPhase.active) unawaited(report());
     });
     ref.listen(authUserIdProvider, (_, next) {
-      if (next.value != null) unawaited(Future(flushPending));
+      if (next.value != null) unawaited(Future(() => ref.mounted ? flushPending() : null));
     }, fireImmediately: true);
     return const SosState();
   }
@@ -359,7 +359,7 @@ class SosAlertsController extends Notifier<SosAlertsState> {
         state = const SosAlertsState();
         return;
       }
-      unawaited(Future(refresh));
+      unawaited(Future(() => ref.mounted ? refresh() : null));
       _poll = Timer.periodic(sosReportEvery, (_) => unawaited(refresh()));
     }, fireImmediately: true);
     return const SosAlertsState();

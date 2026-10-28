@@ -126,7 +126,13 @@ class TrackRecorderController extends Notifier<TrackRecorderState> {
       if (!next.hasValue) return;
       final id = next.value;
       // After build, so the first state is in place
-      unawaited(Future(() => id == null ? reset() : init(id)));
+      // After build (the first state is in place), and not once the provider is gone
+      unawaited(
+        Future(() {
+          if (!ref.mounted) return;
+          id == null ? reset() : unawaited(init(id));
+        }),
+      );
     }, fireImmediately: true);
     // Losing recording access (plan change) pauses the recording; nothing is deleted
     ref.listen(profileProvider, (_, next) {

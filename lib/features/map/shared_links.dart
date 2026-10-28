@@ -9,16 +9,19 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/marked/marked_area_repository.dart';
+import '../../domain/marked/marked_areas.dart';
 import '../../domain/marked/marked_locations.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/survey/survey_utils.dart';
 import '../../domain/util/js_compat.dart';
+import '../areas/area_state.dart' show areaBackendProvider;
 import '../marked/marked_icons.dart';
 import 'map_tools_state.dart';
 
 // Links that open the app (SharedLocationMarker.tsx, SharedPlaceLayer.tsx): /?at=lat,lng
 // shows a "Shared location" pin, /?place=<token> a marked location someone shared, both
-// without signing in. Shared areas (?area=) come with Marked Areas.
+// and /?area=<token> a marked area in focus, all without signing in.
 
 class LinkedPlace {
   const LinkedPlace({
@@ -89,6 +92,13 @@ class SharedPlace extends SharedView {
   final LinkedPlace? place;
 }
 
+/// A marked area from /?area=: shown in focus, the rest of the map darkened
+class SharedArea extends SharedView {
+  const SharedArea(this.status, [this.area]);
+  final LinkStatus status;
+  final LinkedArea? area;
+}
+
 class SharedLinkController extends Notifier<SharedView?> {
   @override
   SharedView? build() => null;
@@ -115,8 +125,19 @@ class SharedLinkController extends Notifier<SharedView?> {
         } on Object {
           state = const SharedPlace(LinkStatus.error);
         }
-      case AreaLink():
-        state = const SharedPlace(LinkStatus.error);
+      case AreaLink(:final token):
+        state = const SharedArea(LinkStatus.loading);
+        try {
+          final area = await ref.read(areaBackendProvider).open(token);
+          if (area == null) {
+            state = const SharedArea(LinkStatus.gone);
+            return;
+          }
+          state = SharedArea(LinkStatus.ok, area);
+          ref.read(fitPointsProvider.notifier).go(area.ring);
+        } on Object {
+          state = const SharedArea(LinkStatus.error);
+        }
     }
   }
 
@@ -254,6 +275,17 @@ class _SharedLinkCardState extends ConsumerState<SharedLinkCard> {
       ),
       SharedPlace(:final place?) => _place(place, close),
       SharedPlace() => const SizedBox.shrink(),
+      SharedArea(status: LinkStatus.loading) => _note('Opening the shared area…', close, busy: true),
+      SharedArea(status: LinkStatus.gone) => _note(
+        'This shared area is no longer available. The owner may have turned the link off.',
+        close,
+      ),
+      SharedArea(status: LinkStatus.error) => _note(
+        'Could not open the shared area. Check your connection and try again.',
+        close,
+      ),
+      SharedArea(:final area?) => _area(area, close),
+      SharedArea() => const SizedBox.shrink(),
     };
     return Material(
       key: const Key('shared-link-card'),
@@ -310,6 +342,42 @@ class _SharedLinkCardState extends ConsumerState<SharedLinkCard> {
         ),
       Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
       IconButton(tooltip: 'Close', icon: const Icon(Icons.close, size: 20), onPressed: onClose),
+    ],
+  );
+
+  Widget _area(LinkedArea a, VoidCallback onClose) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _header(
+        icon: Icons.hexagon_outlined,
+        color: Color(int.parse('FF${a.color.replaceFirst('#', '')}', radix: 16)),
+        title: a.name,
+        subtitle: [
+          formatArea(a.areaM2),
+          'perimeter ${formatLength(a.perimeterM)}',
+          if (a.ownerName != null) 'shared by ${a.ownerName}',
+        ].join(' · '),
+        onClose: onClose,
+        extra: a.notes?.isNotEmpty ?? false
+            ? IconButton(
+                tooltip: _open ? 'Hide notes' : 'Show notes',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(_open ? Icons.expand_more : Icons.expand_less, size: 22),
+                onPressed: () => setState(() => _open = !_open),
+              )
+            : null,
+      ),
+      if (_open && (a.notes?.isNotEmpty ?? false))
+        Padding(
+          padding: const EdgeInsets.fromLTRB(44, 6, 12, 0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 110),
+            child: SingleChildScrollView(
+              child: Text(a.notes!, style: const TextStyle(fontSize: 12, color: L360Colors.sand700, height: 1.35)),
+            ),
+          ),
+        ),
     ],
   );
 

@@ -2587,5 +2587,51 @@
  "share": {
   "url": "https://landscape360.jcdigital.co.id/?at=-6.78991,106.98320",
   "urlNeg": "https://landscape360.jcdigital.co.id/?at=-0.00000,-0.00001"
- }
+ },
+ "tiles": [
+  {
+   "bounds": {
+    "west": 106.95,
+    "south": -6.82,
+    "east": 107.02,
+    "north": -6.75
+   },
+   "min": 13,
+   "max": 15,
+   "count": 93
+  },
+  {
+   "bounds": {
+    "west": 110.4,
+    "south": -7.56,
+    "east": 110.47,
+    "north": -7.5
+   },
+   "min": 12,
+   "max": 14,
+   "count": 22
+  },
+  {
+   "bounds": {
+    "west": 106.8,
+    "south": -6.25,
+    "east": 106.9,
+    "north": -6.15
+   },
+   "min": 14,
+   "max": 16,
+   "count": 526
+  },
+  {
+   "bounds": {
+    "west": -0.1,
+    "south": 51.45,
+    "east": 0.05,
+    "north": 51.55
+   },
+   "min": 10,
+   "max": 12,
+   "count": 15
+  }
+ ]
 }

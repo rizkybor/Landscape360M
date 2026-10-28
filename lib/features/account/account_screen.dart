@@ -9,6 +9,7 @@ import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import '../../domain/account/account_rules.dart';
 import '../../domain/account/profile.dart';
+import '../offline/offline_ui.dart';
 import '../sos/sos_alerts.dart';
 import '../sos/sos_screen.dart';
 import '../sos/sos_state.dart';
@@ -136,6 +137,18 @@ class _AccountBody extends ConsumerWidget {
                 title: Text(hasContact ? 'Edit profile' : 'Add name, organization and phone'),
                 trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
                 onTap: () => context.push('/account/edit'),
+              ),
+            ],
+          ),
+          GroupedSection(
+            title: 'On this phone',
+            children: [
+              ListTile(
+                key: const Key('account-offline'),
+                leading: const TileIcon(Icons.download_for_offline_outlined),
+                title: const Text('Offline maps'),
+                trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                onTap: () => showOfflineSheet(context),
               ),
             ],
           ),
