@@ -7,6 +7,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 import '../../core/theme/app_theme.dart';
 import '../../domain/search/place_search.dart';
 import '../../domain/survey/survey_utils.dart';
+import 'style_guard.dart';
 
 // Points of interest on the map (MapBoxContainer.tsx): a dot per point coloured by its
 // category, grouped into numbered clusters, from zoom 10. Tapping a dot opens its card,
@@ -149,11 +150,15 @@ class PoiLayer {
     _installed = true;
   }
 
-  Future<void> show(List<PointOfInterest> pois) async {
+  Future<void> show(List<PointOfInterest> pois) => onStyle(() => _show(pois));
+
+  Future<void> _show(List<PointOfInterest> pois) async {
     if (_installed) await map.setStyleSourceProperty(poiSource, 'data', poiGeoJson(pois));
   }
 
-  Future<void> setVisible(bool visible) async {
+  Future<void> setVisible(bool visible) => onStyle(() => _setVisible(visible));
+
+  Future<void> _setVisible(bool visible) async {
     if (!_installed) return;
     for (final id in [poiPointsLayer, poiClustersLayer, '$poiSource-count']) {
       await map.setStyleLayerProperty(id, 'visibility', visible ? 'visible' : 'none');

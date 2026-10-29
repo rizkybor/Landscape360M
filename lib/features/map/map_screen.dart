@@ -312,35 +312,46 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 left: 12,
                 right: 12,
                 bottom: sheetInset + 10,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (sosAlerts) ...[const SosBanner(), const SizedBox(height: 10)],
-                    if (sharedLink) ...[const SharedLinkCard(), const SizedBox(height: 10)],
-                    if (poiOpen) ...[const PoiCard(), const SizedBox(height: 10)],
-                    if (picking) ...[const PickingBar(), const SizedBox(height: 10)],
-                    if (areaFocus && !areaPanel && !areaDrawing) ...[const AreaFocusPill(), const SizedBox(height: 10)],
-                    if (framing)
-                      OfflineBar(frame: frame)
-                    else if (areaDrawing)
-                      const AreaDrawingBar()
-                    else if (areaPanel)
-                      const AreaPanel(),
-                    if (markedOpen && !picking) ...[
-                      MarkedCard(
-                        onOpenList: () =>
-                            showMarkedSheet(context, markedHost(ref), focusId: ref.read(markedProvider).selectedId),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
-                    if (liveOn) ...[const LivePill(), const SizedBox(height: 10)],
-                    if (routeOpen) const RoutePanel(),
-                    if (navigatorOpen)
-                      NavigatorPanel(onShowSurvey: (doc) => ref.read(showSurveyProvider.notifier).show(doc)),
-                    if (trackOpen) const TrackRecorderPanel(),
-                  ],
+                // Tablets: panels keep a phone's width instead of stretching across the map
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: L360.panelMaxWidth),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (sosAlerts) ...[const SosBanner(), const SizedBox(height: 10)],
+                        if (sharedLink) ...[const SharedLinkCard(), const SizedBox(height: 10)],
+                        if (poiOpen) ...[const PoiCard(), const SizedBox(height: 10)],
+                        if (picking) ...[const PickingBar(), const SizedBox(height: 10)],
+                        if (areaFocus && !areaPanel && !areaDrawing) ...[
+                          const AreaFocusPill(),
+                          const SizedBox(height: 10),
+                        ],
+                        if (framing)
+                          OfflineBar(frame: frame)
+                        else if (areaDrawing)
+                          const AreaDrawingBar()
+                        else if (areaPanel)
+                          const AreaPanel(),
+                        if (markedOpen && !picking) ...[
+                          MarkedCard(
+                            onOpenList: () =>
+                                showMarkedSheet(context, markedHost(ref), focusId: ref.read(markedProvider).selectedId),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
+                        if (liveOn) ...[const LivePill(), const SizedBox(height: 10)],
+                        if (routeOpen) const RoutePanel(),
+                        if (navigatorOpen)
+                          NavigatorPanel(onShowSurvey: (doc) => ref.read(showSurveyProvider.notifier).show(doc)),
+                        if (trackOpen) const TrackRecorderPanel(),
+                      ],
+                    ),
+                  ),
                 ),
               ),
           ],

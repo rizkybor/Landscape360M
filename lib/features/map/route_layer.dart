@@ -4,6 +4,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../domain/route/route_planner.dart';
 import 'map_tools_state.dart';
+import 'style_guard.dart';
 
 // The planned route on the map, with the web's paint: a white casing under a coloured line
 // (by travel mode), plus the start and destination points
@@ -100,7 +101,9 @@ class RouteLayer {
     await map.addStyleLayer(jsonEncode(layer), null);
   }
 
-  Future<void> show(RoutePlannerState s) async {
+  Future<void> show(RoutePlannerState s) => onStyle(() => _show(s));
+
+  Future<void> _show(RoutePlannerState s) async {
     await map.setStyleSourceProperty(_source, 'data', s.enabled ? routeGeoJson(s) : _empty);
     await map.setStyleLayerProperty('route-planner-line', 'line-color', _hex(s.mode.color));
   }

@@ -295,3 +295,25 @@ Butuh dulu: file di `docs/backend/store/` sudah disalin ke web dan ter-deploy.
 | 8.10 | Android 13+: mulai rekam track | Minta izin notifikasi; notifikasi "Landscape 360 is using GPS" tampil | | |
 | 8.11 | Ketuk link `?at=` di WhatsApp (Android, setelah assetlinks ter-deploy) | Terbuka langsung di app | | |
 
+
+## Fase 9 — Pengujian & performa
+
+Otomatis (diulang sebelum setiap rilis):
+
+| Uji | Perintah | Hasil 29 Okt 2026 |
+|---|---|---|
+| Unit + widget (termasuk 5 ukuran layar × teks 100% / 130%) | `flutter test` | Lulus |
+| Peta diam tidak menggambar ulang | `flutter test integration_test/idle_frames_test.dart -d <sim/HP> --dart-define-from-file=config/dev.json` | iPhone 15 sim: 1 frame dalam 6 dtk; geser peta p90 build 0,62 ms |
+| Login → survei → simpan ke cloud | `flutter test integration_test/survey_flow_test.dart -d <sim/HP> --dart-define-from-file=config/dev.json --dart-define=L360_TEST_EMAIL=… --dart-define=L360_TEST_PASSWORD=…` | Butuh akun uji (dilewati tanpa kredensial) |
+| Gesture Navigator, layer peta, offline, basemap, laporan, kontrol pudar | `integration_test/*.dart` | Lulus di simulator |
+
+Manual di HP fisik (minimal satu Android menengah dan satu iPhone):
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 9.1 | Rekam track 30 menit, layar mati | Baterai turun wajar (catat %), track utuh | | |
+| 9.2 | GPS Tracking 30 menit, layar mati | Posisi terus terkirim, baterai wajar | | |
+| 9.3 | Xcode Instruments → Energy Log, peta diam 1 menit | Energy Impact "Low" | | |
+| 9.4 | Android Studio Profiler, peta diam 1 menit | CPU app mendekati 0% | | |
+| 9.5 | HP lama (Android 10 / iPhone SE) | Peta 3D dan sheet tetap lancar | | |
+| 9.6 | iPad | Sheet, Tools dan halaman akun rapi | | |

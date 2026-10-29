@@ -25,6 +25,7 @@ spesifikasi di `docs/flutter-spec.md`.
 | 7g GPS Tracking | Selesai di app: anggota (pengguna360) Pro / Enterprise membagikan posisi live ke monitor lewat kanal privat, tiap 3 dtk, juga saat layar mati; menjawab permintaan monitor; kirim ulang saat sinyal kembali. Monitor360 dan admin memantau di web. Aktif setelah migration + perubahan web di `docs/backend/live-tracking/` diterapkan. Menunggu uji di HP |
 | 8 Kepatuhan store | Selesai di app: hapus akun (dua langkah + password, data akun di HP ikut dihapus, admin tidak bisa), halaman About (versi, privasi, syarat, hapus akun, dukungan), privacy manifest iOS, teks izin (lokasi, simpan ke Foto), notifikasi Android 13, App Links Android dan Associated Domains iOS (build Release). Bagian web siap disalin dari `docs/backend/store/` (endpoint `DELETE /api/account`, halaman `/delete-account`, `.well-known`, revisi Privacy Policy). Tanpa harga, pembelian, atau iklan di app. Menunggu uji di HP |
 | 8–10 | Belum |
+| 9 Pengujian & performa | Otomatis: peta diam 1 frame / 6 dtk, geser peta p90 0,6 ms; 5 ukuran layar (iPhone SE 320 pt sampai iPad) × teks 130% tanpa overflow; integration test login → survei → simpan (butuh akun uji). Diperbaiki: tab dan tile di layar kecil, panel dan S.O.S selebar HP di iPad, error layer saat ganti gaya peta. Aset store: ikon + splash (`tool/brand/make_icons.py`), screenshot iPhone 6,7" dan iPad 12,9" (`tool/store/`), deskripsi ID/EN (`docs/store/listing.md`). Menunggu uji manual di HP dan screenshot Android |
 
 ## Menjalankan
 

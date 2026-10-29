@@ -56,3 +56,6 @@ key.properties
 .netrc
 *.p12
 *.mobileprovision
+
+# Store screenshots and images: made by tool/brand and tool/store, kept out of git (large)
+/store/

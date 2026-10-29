@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- L360Colors.sand50: behind the launcher icon and the splash -->
+    <color name="brand_background">#FAF8F3</color>
+</resources>

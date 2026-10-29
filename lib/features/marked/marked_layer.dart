@@ -12,6 +12,7 @@ import '../../core/theme/app_theme.dart';
 import '../../domain/marked/marked_locations.dart';
 import '../../domain/survey/survey_utils.dart';
 import '../../domain/util/js_compat.dart';
+import '../map/style_guard.dart';
 import 'marked_icons.dart';
 import 'marked_state.dart';
 
@@ -156,7 +157,9 @@ class MarkedLayer {
     _installed = true;
   }
 
-  Future<void> show(MarkedState s) async {
+  Future<void> show(MarkedState s) => onStyle(() => _show(s));
+
+  Future<void> _show(MarkedState s) async {
     if (!_installed) return;
     await map.setStyleSourceProperty(_source, 'data', markedGeoJson(s.visible));
     // The open location shows its name in the card instead

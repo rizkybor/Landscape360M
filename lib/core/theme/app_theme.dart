@@ -44,6 +44,9 @@ abstract final class L360 {
   static const radiusSmall = 12.0;
   static const gutter = 16.0;
 
+  /// Panels and full screens on tablets keep about a phone's width
+  static const panelMaxWidth = 560.0;
+
   /// Minimum touch target (Apple HIG 44 pt, Material 48 dp)
   static const touch = 44.0;
 

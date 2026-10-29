@@ -18,6 +18,7 @@ import '../../domain/util/js_compat.dart';
 import '../areas/area_state.dart' show areaBackendProvider;
 import '../marked/marked_icons.dart';
 import 'map_tools_state.dart';
+import 'style_guard.dart';
 
 // Links that open the app (SharedLocationMarker.tsx, SharedPlaceLayer.tsx): /?at=lat,lng
 // shows a "Shared location" pin, /?place=<token> a marked location someone shared, both
@@ -235,7 +236,9 @@ class SharedLinkLayer {
 
   static String _hex(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
 
-  Future<void> show(SharedView? v) async {
+  Future<void> show(SharedView? v) => onStyle(() => _show(v));
+
+  Future<void> _show(SharedView? v) async {
     if (_installed) await map.setStyleSourceProperty(_source, 'data', _geo(v));
   }
 }

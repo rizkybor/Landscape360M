@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../domain/tracks/track_recorder_geo.dart';
+import '../map/style_guard.dart';
 import 'track_recorder_state.dart';
 
 // The Track Recorder on the map (TrackRecorderLayer.tsx): the recording in progress in
@@ -105,7 +106,9 @@ class TrackLayer {
     await map.addStyleLayer(jsonEncode(layer), null);
   }
 
-  Future<void> show(TrackRecorderState s) async {
+  Future<void> show(TrackRecorderState s) => onStyle(() => _show(s));
+
+  Future<void> _show(TrackRecorderState s) async {
     if (!_installed) return;
     final viewing = s.viewing?.points ?? const <TrackPoint>[];
     await map.setStyleSourceProperty(_viewing, 'data', trackLinesGeoJson(viewing));

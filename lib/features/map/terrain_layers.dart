@@ -8,6 +8,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../domain/map/grid_dms.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/terrain/contours.dart';
+import 'style_guard.dart';
 
 // Contour and DMS grid layers on the map, with the same sources, layers, filters and paint
 // as the web (ContourLayer.tsx, GridDMSLayer.tsx).
@@ -148,7 +149,9 @@ class TerrainLayers {
   }
 
   /// Visibility, opacity and the index filter after a settings change
-  Future<void> apply(MapSettings s) async {
+  Future<void> apply(MapSettings s) => onStyle(() => _apply(s));
+
+  Future<void> _apply(MapSettings s) async {
     for (final id in _contourLayers) {
       await map.setStyleLayerProperty(id, 'visibility', s.showContours ? 'visible' : 'none');
     }

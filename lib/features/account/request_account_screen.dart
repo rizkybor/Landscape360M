@@ -9,6 +9,7 @@ import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import '../../domain/account/account_request.dart';
 import 'account_screen.dart';
+import 'login_screen.dart' show authMaxWidth;
 
 class RequestAccountScreen extends ConsumerStatefulWidget {
   const RequestAccountScreen({super.key});
@@ -67,35 +68,51 @@ class _RequestAccountScreenState extends ConsumerState<RequestAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Request an account')),
-      body: SafeArea(child: _sent ? _Sent(onDone: () => context.pop()) : _form(context)),
+      appBar: AppBar(),
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: authMaxWidth),
+            child: _sent ? _Sent(onDone: () => context.pop()) : _form(context),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _form(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(L360.gutter),
+    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
     children: [
-      const Padding(
-        padding: EdgeInsets.fromLTRB(4, 0, 4, 20),
-        child: Text(
-          'Tell us who you are. The admin reviews every request and emails your login details after approval. '
-          'New accounts start on the Free plan.',
-          style: TextStyle(color: L360Colors.sand600, height: 1.45),
-        ),
+      Text(
+        'Request an account',
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
       ),
+      const SizedBox(height: 8),
+      const Text(
+        'Tell us who you are. The admin reviews every request and emails your login details after approval. '
+        'New accounts start on the Free plan.',
+        style: TextStyle(color: L360Colors.sand600, height: 1.45),
+      ),
+      const SizedBox(height: 32),
+      const SectionLabel('About you'),
       FormFieldRow(
+        fieldKey: const Key('request-name'),
         controller: _name,
         label: 'Full name',
         icon: Icons.person_outline,
         autofill: const [AutofillHints.name],
       ),
       FormFieldRow(
+        fieldKey: const Key('request-email'),
         controller: _email,
         label: 'Email',
         icon: Icons.mail_outline,
         keyboardType: TextInputType.emailAddress,
         autofill: const [AutofillHints.email],
       ),
+      const SizedBox(height: 12),
+      const SectionLabel('Organization and contact'),
       FormFieldRow(
         controller: _organization,
         label: 'Organization (optional)',
@@ -110,15 +127,19 @@ class _RequestAccountScreenState extends ConsumerState<RequestAccountScreen> {
         autofill: const [AutofillHints.telephoneNumber],
         helper: '8 to 15 digits',
       ),
+      const SizedBox(height: 12),
+      const SectionLabel('Your request'),
       FormFieldRow(
+        fieldKey: const Key('request-message'),
         controller: _message,
-        label: 'How will you use Landscape 360 app?',
-        icon: Icons.chat_bubble_outline,
-        maxLines: 4,
+        label: 'Message',
+        helper: 'How will you use Landscape 360 app?',
+        maxLines: 5,
         maxLength: 1000,
         textInputAction: TextInputAction.newline,
       ),
-      if (_error != null) ...[ErrorBanner(_error!), const SizedBox(height: 12)],
+      if (_error != null) ...[const SizedBox(height: 4), ErrorBanner(_error!)],
+      const SizedBox(height: 24),
       BusyButton(label: 'Send request', busy: _busy, onPressed: _submit),
     ],
   );

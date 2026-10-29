@@ -4,6 +4,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../domain/survey/survey_model.dart';
 import '../../domain/survey/survey_utils.dart';
+import '../map/style_guard.dart';
 
 // Survey lines on the map, like the web's PlottingLayer: each sheet in its colour (curves,
 // sharp corners and Bezier handles drawn by buildSurveyLine), the active sheet opaque, and
@@ -107,7 +108,9 @@ class NavigatorLayer {
     await map.addStyleLayer(jsonEncode(layer), null);
   }
 
-  Future<void> show(SurveyDoc doc, String? selectedPointId) async {
+  Future<void> show(SurveyDoc doc, String? selectedPointId) => onStyle(() => _show(doc, selectedPointId));
+
+  Future<void> _show(SurveyDoc doc, String? selectedPointId) async {
     if (!_installed) return;
     await map.setStyleSourceProperty(_lines, 'data', surveyLinesGeoJson(doc));
     await map.setStyleSourceProperty(_handles, 'data', handleGeoJson(doc, selectedPointId));
