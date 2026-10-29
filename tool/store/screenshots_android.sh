@@ -24,7 +24,7 @@ demo notifications -e visible false
 
 log="$(mktemp)"
 flutter test integration_test/store_screenshots_test.dart -d "$device" --flavor dev \
-  --dart-define-from-file=config/dev.json >"$log" 2>&1 &
+  --dart-define-from-file=config/dev.json --dart-define=L360_SHOT_SLOW=2 >"$log" 2>&1 &
 test_pid=$!
 
 taken=0

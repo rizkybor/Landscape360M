@@ -73,9 +73,10 @@ void main() {
     }
   }
 
-  // Tiles load, then the screen is held still while it is saved
+  // Tiles load, then the screen is held still while it is saved (slower devices such as an
+  // emulator get more time: --dart-define=L360_SHOT_SLOW=2)
   Future<void> shot(WidgetTester tester, String name, {int settle = 9000}) async {
-    await wait(tester, settle);
+    await wait(tester, settle * const int.fromEnvironment('L360_SHOT_SLOW', defaultValue: 1));
     debugPrint('SHOT:$name');
     await wait(tester, 5000);
   }

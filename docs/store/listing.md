@@ -7,7 +7,10 @@ Images:
 - App icon: `store/icon-app-store-1024.png` (App Store), `store/icon-google-play-512.png` (Play)
 - Feature graphic (Play): `store/google-play-feature-graphic.png`
 - Screenshots with captions: `store/framed/<id|en>/ios-6.7/` (iPhone 6.7"/6.9"),
-  `store/framed/<id|en>/ipad-12.9/` (iPad 13"); raw ones in `store/screenshots/`
+  `store/framed/<id|en>/ipad-12.9/` (iPad 13"), `store/framed/<id|en>/android-phone/`
+  (Google Play, 1080 x 1920); raw ones in `store/screenshots/`
+- Made again with `tool/store/screenshots.sh` (iOS simulator), `tool/store/screenshots_android.sh`
+  (emulator, 3 GB RAM) and `tool/store/frame_screenshots.py` (needs Pillow)
 - Order: 3D terrain, Navigator, Track Recorder, Marked Area, offline map, my location, S.O.S
 
 Category: Navigation (App Store primary), Travel or Sports (secondary); Play: Maps & Navigation.

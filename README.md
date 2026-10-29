@@ -37,6 +37,9 @@ flutter run --flavor dev --dart-define-from-file=config/dev.json
 `config/*.json` tidak di-commit. Jangan pernah mengisi service role key: aplikasi akan
 menolak start (lihat `docs/security.md`).
 
+Menyiapkan dari awal setelah clone (alat, iPhone, Android, file yang tidak ada di git):
+[`docs/setup.md`](docs/setup.md).
+
 ## Test
 
 ```sh
