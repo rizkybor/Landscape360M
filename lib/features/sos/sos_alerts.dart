@@ -12,6 +12,7 @@ import '../../domain/account/account_rules.dart';
 import '../../domain/survey/survey_utils.dart';
 import '../../domain/util/js_compat.dart';
 import '../map/map_tools_state.dart';
+import '../map/style_guard.dart';
 import 'sos_state.dart';
 
 // Admin side of S.O.S (SosAdminLayer.tsx + SosAlertsPanel.tsx): a red banner and a red
@@ -491,7 +492,9 @@ class SosAlertsLayer {
     _installed = true;
   }
 
-  Future<void> show(List<SosAlert> alerts) async {
+  Future<void> show(List<SosAlert> alerts) => onStyle(() => _show(alerts));
+
+  Future<void> _show(List<SosAlert> alerts) async {
     if (!_installed) return;
     await map.setStyleSourceProperty(_source, 'data', sosAlertsGeoJson(alerts));
   }

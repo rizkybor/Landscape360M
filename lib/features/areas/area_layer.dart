@@ -4,6 +4,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 
 import '../../domain/geo/spherical.dart';
 import '../../domain/marked/marked_areas.dart';
+import '../map/style_guard.dart';
 import 'area_state.dart';
 
 // Marked Areas on the map (MarkedAreaLayer.tsx, SharedAreaLayer.tsx): every saved area with
@@ -193,7 +194,9 @@ class AreaLayer {
   }
 
   /// [linked]: an area opened from a share link, shown in focus over everything else
-  Future<void> show(AreasState s, {FocusShape? linked}) async {
+  Future<void> show(AreasState s, {FocusShape? linked}) => onStyle(() => _show(s, linked: linked));
+
+  Future<void> _show(AreasState s, {FocusShape? linked}) async {
     if (!_installed) return;
     await map.setStyleSourceProperty(_areas, 'data', areasGeoJson(s));
     await map.setStyleSourceProperty(_labels, 'data', _labelsGeoJson(s));

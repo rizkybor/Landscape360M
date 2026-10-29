@@ -68,7 +68,11 @@ void main() {
       greaterThanOrEqualTo(20),
     );
     expect(find.text('Sign in to Landscape 360 app to save surveys, tracks and places.'), findsOneWidget);
-    await tester.dragUntilVisible(find.byKey(const Key('login-credits')), find.byType(ListView), const Offset(0, -200));
+    await tester.dragUntilVisible(
+      find.byKey(const Key('login-credits')),
+      find.byType(Scrollable).first,
+      const Offset(0, -200),
+    );
     expect(find.text('Jendela Cakra Digital'), findsOneWidget);
     expect(find.text('Makopala Univ. Budi Luhur'), findsOneWidget);
   });
@@ -85,6 +89,9 @@ void main() {
     expect(find.text('User Account'), findsOneWidget);
     expect(find.text('Budi'), findsOneWidget);
     expect(find.text('Pro'), findsOneWidget);
+    // Role as people read it, initials in the avatar
+    expect(find.text('Member'), findsOneWidget);
+    expect(find.text('B'), findsOneWidget);
     expect(find.text('Open the admin panel on the web'), findsNothing);
   });
 

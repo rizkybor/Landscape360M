@@ -138,7 +138,14 @@ class _SosScreenState extends ConsumerState<SosScreen> {
                 style: const TextStyle(color: Colors.white),
                 child: IconTheme.merge(
                   data: const IconThemeData(color: Colors.white),
-                  child: s.phase == SosPhase.active ? _active(s) : _countdown(s),
+                  // Tablets: a phone-width column in the middle of the red screen
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 640),
+                      child: SizedBox.expand(child: s.phase == SosPhase.active ? _active(s) : _countdown(s)),
+                    ),
+                  ),
                 ),
               ),
               if (_flashOn)

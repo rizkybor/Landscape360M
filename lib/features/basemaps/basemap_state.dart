@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/providers.dart';
 import '../../data/basemaps/custom_basemaps.dart';
+import '../map/style_guard.dart';
 
 // Custom basemaps on the phone: the account's list, which are switched on (saved in the
 // account like the web), the opacity of each (on this phone), and the pictures kept here so
@@ -182,7 +183,9 @@ class BasemapLayer {
     _installed = true;
   }
 
-  Future<void> show(BasemapsState s, {String? below}) async {
+  Future<void> show(BasemapsState s, {String? below}) => onStyle(() => _show(s, below: below));
+
+  Future<void> _show(BasemapsState s, {String? below}) async {
     if (!_installed) return;
     final want = {
       for (final b in s.basemaps)

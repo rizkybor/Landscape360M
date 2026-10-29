@@ -89,16 +89,18 @@ class SectionLabel extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
     child: Row(
       children: [
-        Text(
-          text.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.9,
-            color: L360Colors.sand500,
+        // Large text on a narrow phone: the label wraps instead of overflowing
+        Expanded(
+          child: Text(
+            text.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.9,
+              color: L360Colors.sand500,
+            ),
           ),
         ),
-        const Spacer(),
         ?trailing,
       ],
     ),

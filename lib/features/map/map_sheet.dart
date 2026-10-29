@@ -401,16 +401,20 @@ class _SectionTabs extends StatelessWidget {
                         tween: Tween(end: section == value ? 1 : 0),
                         builder: (context, t, _) {
                           final color = Color.lerp(L360Colors.sand600, L360Colors.forest800, t);
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(icon, size: 16, color: Color.lerp(L360Colors.sand500, L360Colors.forest800, t)),
-                              const SizedBox(width: 6),
-                              Text(
-                                label,
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
-                              ),
-                            ],
+                          // Narrow phones and large text: the tab shrinks instead of overflowing
+                          return FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(icon, size: 16, color: Color.lerp(L360Colors.sand500, L360Colors.forest800, t)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  label,
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
@@ -656,41 +660,50 @@ class ToolTile extends StatelessWidget {
         opacity: enabled && !locked ? 1 : 0.5,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: active ? L360Colors.forest700 : L360Colors.sand100,
-                  borderRadius: BorderRadius.circular(10),
+          // Small tiles (320 pt phones) or large text: the content shrinks to fit the square
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: active ? L360Colors.forest700 : L360Colors.sand100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 19, color: active ? Colors.white : L360Colors.sand700),
                 ),
-                child: Icon(icon, size: 19, color: active ? Colors.white : L360Colors.sand700),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.2,
-                  fontWeight: FontWeight.w700,
-                  color: active ? L360Colors.ink : L360Colors.sand700,
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                    color: active ? L360Colors.ink : L360Colors.sand700,
+                  ),
                 ),
-              ),
-              if (active)
-                const Text(
-                  'Active',
-                  style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: L360Colors.forest700),
-                )
-              else if (!enabled)
-                const Text(
-                  'Soon',
-                  style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: L360Colors.sand500),
-                ),
-            ],
+                if (active)
+                  const Text(
+                    'Active',
+                    style: TextStyle(
+                      fontSize: 9,
+                      height: 1.2,
+                      fontWeight: FontWeight.w600,
+                      color: L360Colors.forest700,
+                    ),
+                  )
+                else if (!enabled)
+                  const Text(
+                    'Soon',
+                    style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: L360Colors.sand500),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
