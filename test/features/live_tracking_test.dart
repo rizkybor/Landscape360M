@@ -134,19 +134,16 @@ void main() {
   test('the packet the web monitor reads (TrackerPacket)', () {
     expect(liveTrackerId(email: 'rina.hiker@x.id', userId: 'abc'), 'RINA.HIKER');
     expect(liveTrackerId(email: '', userId: '3f2a9c1e-0000'), '3F2A9C1E');
-    expect(
-      const LivePacket(trackerId: 'RINA', lat: -6.78, lng: 106.98, battery: 64, time: 1761700000123).toJson(),
-      {
-        'user_id': 'RINA',
-        'lat': -6.78,
-        'lng': 106.98,
-        'alt': 0,
-        'speed': 0,
-        'battery': 64,
-        'timestamp': '2025-10-29T01:06:40.123Z',
-        'status': 'active',
-      },
-    );
+    expect(const LivePacket(trackerId: 'RINA', lat: -6.78, lng: 106.98, battery: 64, time: 1761700000123).toJson(), {
+      'user_id': 'RINA',
+      'lat': -6.78,
+      'lng': 106.98,
+      'alt': 0,
+      'speed': 0,
+      'battery': 64,
+      'timestamp': '2025-10-29T01:06:40.123Z',
+      'status': 'active',
+    });
   });
 
   test('one position every 3 s; a monitor asking gets one at once', () async {

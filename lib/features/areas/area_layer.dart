@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 
 import '../../domain/geo/spherical.dart';
+import '../../domain/marked/area_contours.dart';
 import '../../domain/marked/marked_areas.dart';
 import '../map/style_guard.dart';
 import 'area_state.dart';
@@ -16,6 +17,7 @@ const _areas = 'marked-areas';
 const _labels = 'marked-areas-labels';
 const _draft = 'marked-area-draft';
 const _mask = 'marked-area-mask';
+const _contours = 'marked-area-contours';
 const _empty = <String, Object>{'type': 'FeatureCollection', 'features': <Object>[]};
 
 Map<String, Object> areasGeoJson(AreasState s) => {
@@ -78,7 +80,7 @@ class AreaLayer {
 
   Future<void> install() async {
     _installed = false;
-    for (final id in [_mask, _areas, _labels, _draft]) {
+    for (final id in [_mask, _contours, _areas, _labels, _draft]) {
       if (!await map.styleSourceExists(id)) {
         await map.addStyleSource(id, jsonEncode({'type': 'geojson', 'data': _empty}));
       }
@@ -103,6 +105,55 @@ class AreaLayer {
           'line-color': ['get', 'color'],
           'line-width': 3.5,
         },
+      },
+      // Contours uploaded on the website (AreaContourLines.tsx): topographic brown, so they
+      // read apart from the map's own gold contours; index lines thicker and labelled
+      {
+        'id': '$_contours-line',
+        'type': 'line',
+        'source': _contours,
+        'paint': {
+          'line-color': '#8a5a2b',
+          'line-width': [
+            'case',
+            ['get', 'index'],
+            1.8,
+            0.9,
+          ],
+          'line-opacity': 0.9,
+        },
+      },
+      {
+        'id': '$_contours-label',
+        'type': 'symbol',
+        'source': _contours,
+        'minzoom': 12,
+        'filter': [
+          'all',
+          ['get', 'index'],
+          [
+            '!=',
+            ['get', 'elevation'],
+            null,
+          ],
+        ],
+        'layout': {
+          'symbol-placement': 'line',
+          'text-field': [
+            'concat',
+            [
+              'to-string',
+              [
+                'round',
+                ['get', 'elevation'],
+              ],
+            ],
+            ' m',
+          ],
+          'text-size': 10,
+          'symbol-spacing': 300,
+        },
+        'paint': {'text-color': '#6b4220', 'text-halo-color': '#ffffff', 'text-halo-width': 1.4},
       },
       {
         'id': areaFillLayer,
@@ -194,10 +245,13 @@ class AreaLayer {
   }
 
   /// [linked]: an area opened from a share link, shown in focus over everything else
-  Future<void> show(AreasState s, {FocusShape? linked}) => onStyle(() => _show(s, linked: linked));
+  /// [linkedContours]: the contours uploaded to that area, when it has any
+  Future<void> show(AreasState s, {FocusShape? linked, ContourSet? linkedContours}) =>
+      onStyle(() => _show(s, linked: linked, linkedContours: linkedContours));
 
-  Future<void> _show(AreasState s, {FocusShape? linked}) async {
+  Future<void> _show(AreasState s, {FocusShape? linked, ContourSet? linkedContours}) async {
     if (!_installed) return;
+    await map.setStyleSourceProperty(_contours, 'data', contourLinesGeoJson([...s.contourSets, ?linkedContours]));
     await map.setStyleSourceProperty(_areas, 'data', areasGeoJson(s));
     await map.setStyleSourceProperty(_labels, 'data', _labelsGeoJson(s));
     await map.setStyleSourceProperty(_draft, 'data', s.drawing ? draftGeoJson(s.draft) : _empty);

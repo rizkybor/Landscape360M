@@ -2,11 +2,38 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["APPLE_TEAM_ID.id.co.jcdigital.landscape360"],
+        "appIDs": [
+          "APPLE_TEAM_ID.id.co.jcdigital.landscape360"
+        ],
         "components": [
-          { "/": "/", "?": { "at": "*" }, "comment": "Shared position" },
-          { "/": "/", "?": { "place": "*" }, "comment": "Shared marked location" },
-          { "/": "/", "?": { "area": "*" }, "comment": "Shared marked area" }
+          {
+            "/": "/",
+            "?": {
+              "at": "*"
+            },
+            "comment": "Shared position"
+          },
+          {
+            "/": "/",
+            "?": {
+              "place": "*"
+            },
+            "comment": "Shared marked location"
+          },
+          {
+            "/": "/",
+            "?": {
+              "area": "*"
+            },
+            "comment": "Shared marked area"
+          },
+          {
+            "/": "/",
+            "?": {
+              "classic": "*"
+            },
+            "comment": "Shared Classic Field Work"
+          }
         ]
       }
     ]

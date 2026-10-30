@@ -10,12 +10,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/marked/marked_area_repository.dart';
+import '../../domain/marked/area_contours.dart' show ContourSet;
 import '../../domain/marked/marked_areas.dart';
 import '../../domain/marked/marked_locations.dart';
 import '../../domain/share/share_location.dart';
 import '../../domain/survey/survey_utils.dart';
 import '../../domain/util/js_compat.dart';
 import '../areas/area_state.dart' show areaBackendProvider;
+import '../classic/classic_state.dart';
 import '../marked/marked_icons.dart';
 import 'map_tools_state.dart';
 import 'style_guard.dart';
@@ -95,9 +97,17 @@ class SharedPlace extends SharedView {
 
 /// A marked area from /?area=: shown in focus, the rest of the map darkened
 class SharedArea extends SharedView {
-  const SharedArea(this.status, [this.area]);
+  const SharedArea(this.status, [this.area, this.contours]);
   final LinkStatus status;
   final LinkedArea? area;
+  final ContourSet? contours; // uploaded on the website, drawn with the area
+}
+
+/// A Classic Field Work from /?classic=: opened read only in the Classic panel; this card
+/// only shows while it loads or when it cannot be opened
+class SharedClassic extends SharedView {
+  const SharedClassic(this.status);
+  final LinkStatus status;
 }
 
 class SharedLinkController extends Notifier<SharedView?> {
@@ -126,6 +136,19 @@ class SharedLinkController extends Notifier<SharedView?> {
         } on Object {
           state = const SharedPlace(LinkStatus.error);
         }
+      case ClassicLink(:final token):
+        state = const SharedClassic(LinkStatus.loading);
+        try {
+          final shared = await ref.read(classicLinksProvider).open(token);
+          if (shared == null) {
+            state = const SharedClassic(LinkStatus.gone);
+            return;
+          }
+          ref.read(classicProvider.notifier).view(shared);
+          state = null;
+        } on Object {
+          state = const SharedClassic(LinkStatus.error);
+        }
       case AreaLink(:final token):
         state = const SharedArea(LinkStatus.loading);
         try {
@@ -136,6 +159,12 @@ class SharedLinkController extends Notifier<SharedView?> {
           }
           state = SharedArea(LinkStatus.ok, area);
           ref.read(fitPointsProvider.notifier).go(area.ring);
+          // Contours uploaded to the area, if any (after the area, which shows at once)
+          final contours = await ref.read(areaBackendProvider).linkContours(token);
+          final now = state;
+          if (contours != null && now is SharedArea && identical(now.area, area)) {
+            state = SharedArea(LinkStatus.ok, area, contours);
+          }
         } on Object {
           state = const SharedArea(LinkStatus.error);
         }
@@ -289,6 +318,12 @@ class _SharedLinkCardState extends ConsumerState<SharedLinkCard> {
       ),
       SharedArea(:final area?) => _area(area, close),
       SharedArea() => const SizedBox.shrink(),
+      SharedClassic(status: LinkStatus.loading) => _note('Opening the shared Field Work…', close, busy: true),
+      SharedClassic(status: LinkStatus.gone) => _note(
+        'This shared Field Work is no longer available. The owner may have stopped sharing it.',
+        close,
+      ),
+      SharedClassic() => _note('Could not open the shared Field Work. Check your connection and try again.', close),
     };
     return Material(
       key: const Key('shared-link-card'),

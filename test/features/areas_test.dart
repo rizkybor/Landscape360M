@@ -6,6 +6,7 @@ import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/data/marked/marked_area_repository.dart';
 import 'package:landscape360/domain/account/profile.dart';
 import 'package:landscape360/domain/geo/spherical.dart';
+import 'package:landscape360/domain/marked/area_contours.dart';
 import 'package:landscape360/domain/share/share_location.dart';
 import 'package:landscape360/features/areas/area_layer.dart';
 import 'package:landscape360/features/areas/area_panel.dart';
@@ -67,7 +68,42 @@ class FakeAreas implements MarkedAreaBackend {
 
   @override
   Future<LinkedArea?> open(String token) async => linked;
+
+  List<AreaContourMeta> meta = [];
+  final contourData = <String, Map<String, dynamic>>{};
+  ContourSet? linkedContours;
+
+  @override
+  Future<List<AreaContourMeta>> contourMeta(String userId) async => meta;
+
+  @override
+  Future<Map<String, dynamic>> contours(String areaId) async {
+    calls.add('contours:$areaId');
+    return contourData[areaId]!;
+  }
+
+  @override
+  Future<ContourSet?> linkContours(String token) async => linkedContours;
 }
+
+/// Two lines, 1200 m (an index line every 50 m at 12.5 m) and 1212.5 m
+Map<String, dynamic> lines() => {
+  'type': 'FeatureCollection',
+  'features': [
+    for (final e in [1200.0, 1212.5])
+      {
+        'type': 'Feature',
+        'properties': {'elevation': e},
+        'geometry': {
+          'type': 'LineString',
+          'coordinates': [
+            [106.98, -6.78],
+            [106.981, -6.779],
+          ],
+        },
+      },
+  ],
+};
 
 AccountProfile _profile(Plan plan) => AccountProfile(
   userId: 'u1',
@@ -78,6 +114,9 @@ AccountProfile _profile(Plan plan) => AccountProfile(
   isAdmin: false,
   canUseSos: false,
 );
+
+MarkedArea _area(String id) =>
+    MarkedArea(id: id, userId: 'u1', name: 'Area $id', color: '#d49b22', ring: square, areaM2: 12300, perimeterM: 444);
 
 void main() {
   late FakeAreas backend;
@@ -199,6 +238,77 @@ void main() {
     backend.linked = null;
     await c.read(sharedLinkProvider.notifier).open(const AreaLink('0123456789abcdef0123456789abcdef'));
     expect((c.read(sharedLinkProvider)! as SharedArea).status, LinkStatus.gone);
+  });
+
+  group('contours uploaded on the website', () {
+    test('index lines like contourGeo.ts (1:4, or 1:5 at 5, 10 and 100 m)', () {
+      expect([5, 10, 12.5, 25, 50, 100, 125, 20].map((v) => indexIntervalFor(v.toDouble())), [
+        25,
+        50,
+        50,
+        100,
+        200,
+        500,
+        500,
+        80,
+      ]);
+      expect((isIndexLine(1200, 12.5), isIndexLine(1212.5, 12.5), isIndexLine(-50, 12.5)), (true, false, true));
+      expect(isIndexLine(null, 10), isFalse);
+      // Without a known interval every line is drawn as an index line
+      final f =
+          contourLinesGeoJson([(data: lines(), intervalM: 12.5), (data: lines(), intervalM: null)])['features']!
+              as List;
+      expect([for (final x in f) ((x as Map)['properties'] as Map)['index']], [true, false, true, true]);
+    });
+
+    test('loading knows which areas have contours; focusing one shows them; hide and show', () async {
+      backend
+        ..rows = [_area('a1'), _area('a2')]
+        ..meta = [
+          AreaContourMeta.fromRow({
+            'area_id': 'a1',
+            'source_name': 'kontur.shp',
+            'source_format': 'shp',
+            'interval_m': 12.5,
+            'line_count': 2,
+            'min_elevation': 1200,
+            'max_elevation': 1212.5,
+          }),
+        ]
+        ..contourData['a1'] = lines();
+      final c = container();
+      await settle();
+      expect(c.read(areasProvider).contourMeta.keys, ['a1']);
+      expect(c.read(areasProvider).shownContours, isEmpty, reason: 'lines are loaded only when needed');
+
+      final rec = c.read(areasProvider.notifier)..focus('a2');
+      await settle();
+      expect(backend.calls.where((x) => x.startsWith('contours')), isEmpty, reason: 'a2 has none');
+      rec.focus('a1');
+      await settle();
+      expect(c.read(areasProvider).contourSets.single.intervalM, 12.5);
+
+      rec.hideContours('a1');
+      expect(c.read(areasProvider).shownContours, isEmpty);
+      await rec.showContours('a1');
+      await rec.showContours('a1');
+      expect(backend.calls.where((x) => x == 'contours:a1'), hasLength(2), reason: 'not again while shown');
+
+      await rec.delete('a1');
+      expect(c.read(areasProvider).contourMeta, isEmpty);
+      expect(c.read(areasProvider).shownContours, isEmpty);
+    });
+
+    test('a shared area brings its contours', () async {
+      backend
+        ..linked = LinkedArea(name: 'Kawah', color: '#E46C24', ring: square, areaM2: 1, perimeterM: 1)
+        ..linkedContours = (data: lines(), intervalM: 12.5);
+      final c = container();
+      await settle();
+      await c.read(sharedLinkProvider.notifier).open(const AreaLink('0123456789abcdef0123456789abcdef'));
+      final v = c.read(sharedLinkProvider)! as SharedArea;
+      expect(v.contours?.intervalM, 12.5);
+    });
   });
 
   group('screens', () {

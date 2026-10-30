@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/geo/spherical.dart';
+import '../../domain/marked/area_contours.dart';
 import '../../domain/marked/marked_areas.dart';
 
 // Marked areas in the cloud (src/services/markedAreaSync.ts): table marked_areas and the
@@ -120,6 +121,15 @@ abstract interface class MarkedAreaBackend {
 
   /// Null when the link does not exist or was turned off
   Future<LinkedArea?> open(String token);
+
+  /// Which of my areas have contours uploaded on the website; empty before the migration
+  Future<List<AreaContourMeta>> contourMeta(String userId);
+
+  /// The contour lines of one of my areas (GeoJSON)
+  Future<Map<String, dynamic>> contours(String areaId);
+
+  /// The contours of a shared area, or null (none, link off, or migration not run)
+  Future<ContourSet?> linkContours(String token);
 }
 
 // The table or functions are missing until the migration is run
@@ -181,4 +191,38 @@ class SupabaseMarkedAreaBackend implements MarkedAreaBackend {
     final rows = await client.rpc<List<dynamic>>('open_marked_area_link', params: {'p_token': token});
     return rows.isEmpty ? null : LinkedArea.fromRow(Map<String, dynamic>.from(rows.first as Map));
   });
+
+  // --- Contours uploaded on the website (marked_area_contours, 20261030000021)
+
+  static const _contourMeta =
+      'area_id, source_name, source_format, interval_m, line_count, min_elevation, max_elevation, updated_at';
+
+  @override
+  Future<List<AreaContourMeta>> contourMeta(String userId) async {
+    try {
+      final rows = await client.from('marked_area_contours').select(_contourMeta).eq('user_id', userId);
+      return rows.map(AreaContourMeta.fromRow).toList();
+    } on PostgrestException catch (e) {
+      if (_missing.hasMatch('${e.code ?? ''} ${e.message}')) return const [];
+      throw MarkedAreaException(e.message);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> contours(String areaId) => _call(() async {
+    final row = await client.from('marked_area_contours').select('data').eq('area_id', areaId).single();
+    return Map<String, dynamic>.from(row['data'] as Map);
+  });
+
+  @override
+  Future<ContourSet?> linkContours(String token) async {
+    try {
+      final rows = await client.rpc<List<dynamic>>('open_marked_area_link_contours', params: {'p_token': token});
+      if (rows.isEmpty) return null;
+      final r = Map<String, dynamic>.from(rows.first as Map);
+      return (data: Map<String, dynamic>.from(r['data'] as Map), intervalM: (r['interval_m'] as num?)?.toDouble());
+    } on Object {
+      return null;
+    }
+  }
 }

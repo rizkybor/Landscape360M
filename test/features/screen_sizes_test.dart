@@ -9,6 +9,9 @@ import 'package:landscape360/core/providers.dart';
 import 'package:landscape360/core/router.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/domain/account/profile.dart';
+import 'package:landscape360/domain/classic/field_work.dart';
+import 'package:landscape360/features/classic/classic_panel.dart';
+import 'package:landscape360/features/classic/classic_state.dart';
 import 'package:landscape360/features/live/live_tracking_sheet.dart';
 import 'package:landscape360/features/map/map_sheet.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -107,6 +110,39 @@ void main() {
           await pump(tester, size, () => routed(page, signedIn: true), textScale: scale);
           expectFits(tester, reason: page);
         }
+      });
+
+      testWidgets('$label: the Classic panel, both modes', (tester) async {
+        late ProviderContainer c;
+        await pump(
+          tester,
+          size,
+          () => ProviderScope(
+            overrides: overrides(signedIn: true),
+            child: Consumer(
+              builder: (context, ref, _) {
+                c = ProviderScope.containerOf(context);
+                return MaterialApp(
+                  theme: buildAppTheme(),
+                  home: const Scaffold(
+                    body: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(padding: EdgeInsets.all(12), child: ClassicPanel()),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          textScale: scale,
+        );
+        c.read(classicProvider.notifier).setPanelOpen(true);
+        await tester.pumpAndSettle();
+        expectFits(tester, reason: 'resection');
+        c.read(classicProvider.notifier).setMode(ClassicMode.intersection);
+        await tester.pumpAndSettle();
+        expectFits(tester, reason: 'intersection');
+        await tester.pump(const Duration(seconds: 1));
       });
 
       testWidgets('$label: map sheet sections and the GPS sheet', (tester) async {

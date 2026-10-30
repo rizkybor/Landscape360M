@@ -317,3 +317,20 @@ Manual di HP fisik (minimal satu Android menengah dan satu iPhone):
 | 9.4 | Android Studio Profiler, peta diam 1 menit | CPU app mendekati 0% | | |
 | 9.5 | HP lama (Android 10 / iPhone SE) | Peta 3D dan sheet tetap lancar | | |
 | 9.6 | iPad | Sheet, Tools dan halaman akun rapi | | |
+
+## Fase 9b — Classic dan kontur area (update web 30 Okt)
+
+| # | Langkah | Hasil yang diharapkan | Android | iPhone |
+|---|---|---|---|---|
+| 9b.1 | Tanpa login → Tools → Classic | Panel terbuka (tanpa login), titik GPS disembunyikan | | |
+| 9b.2 | Resection: Pick on map posisi Anda, azimuth A 60°, Check, back 240°, Check | Garis merah dan emas putus dari posisi Anda, mawar kompas di titik, langkah B terbuka | | |
+| 9b.3 | Back azimuth salah dua kali | Petunjuk aturan ±180°, lalu "Answer: …" | | |
+| 9b.4 | Intersection: posisi A dan B (ketik DMS / pilih di peta), azimuth kedua posisi | X dan lingkaran merah berdenyut, "Most likely within ±…", Copy coordinates | | |
+| 9b.5 | Seret titik ujung garis | Garis memanjang / memendek, arah tetap; "Reset line lengths" | | |
+| 9b.6 | Perkecil panel, geser peta | Peta mengikuti titik di atas panel | | |
+| 9b.7 | Pro: New Field Work, ganti nama, hapus; Free: tombol New terkunci | Batas 1 / 5 / 10 per mode | | |
+| 9b.8 | Login → Share → Create link → buka link di web | Web menampilkan Field Work yang sama (view only); ubah azimuth di app → web ikut berubah | | |
+| 9b.9 | Buka link `?classic=` dari WhatsApp di HP | App membuka panel "Shared · view only" | | |
+| 9b.10 | Area dengan kontur unggahan (dari web) → Focus | Garis kontur cokelat dengan label ketinggian; tombol lapis menyembunyikan / menampilkan | | |
+| 9b.11 | Link `?area=` dari area dengan kontur | Kontur ikut tampil di area yang difokuskan | | |
+
