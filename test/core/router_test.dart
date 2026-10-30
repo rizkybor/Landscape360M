@@ -9,8 +9,11 @@ import 'package:landscape360/core/router.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/domain/account/profile.dart';
 import 'package:landscape360/features/account/account_screen.dart';
+import 'package:landscape360/features/offline/offline_state.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+
+import '../features/offline_test.dart' show FakeEngine, FakeRecords;
 
 void main() {
   setUp(() => SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty());
@@ -30,6 +33,8 @@ void main() {
               apiBaseUrl: 'https://landscape360.jcdigital.co.id',
             ),
           ),
+          offlineRecordsProvider.overrideWithValue(FakeRecords()),
+          offlineEngineProvider.overrideWithValue(FakeEngine()),
           authUserIdProvider.overrideWith((ref) => Stream.value(signedIn ? 'u1' : null)),
           profileProvider.overrideWith(
             (ref) async => signedIn
@@ -93,6 +98,16 @@ void main() {
     expect(find.text('Member'), findsOneWidget);
     expect(find.text('B'), findsOneWidget);
     expect(find.text('Open the admin panel on the web'), findsNothing);
+  });
+
+  testWidgets('Offline maps in User Account closes it and opens the sheet over the map', (tester) async {
+    await pump(tester, signedIn: true, start: '/account');
+    expect(find.text('User Account'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('account-offline')));
+    await tester.tap(find.byKey(const Key('account-offline')));
+    await tester.pumpAndSettle();
+    expect(find.text('User Account'), findsNothing, reason: 'back on the map');
+    expect(find.byKey(const Key('offline-new')), findsOneWidget, reason: 'the Offline maps sheet is open');
   });
 
   testWidgets('signing out on the account page goes back to the map, never a blank page', (tester) async {

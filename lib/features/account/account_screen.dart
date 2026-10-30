@@ -9,7 +9,7 @@ import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import '../../domain/account/account_rules.dart';
 import '../../domain/account/profile.dart';
-import '../offline/offline_ui.dart';
+import '../offline/offline_state.dart' show offlineSheetRequestProvider;
 import '../sos/sos_alerts.dart';
 import '../sos/sos_screen.dart';
 import '../sos/sos_state.dart';
@@ -136,7 +136,12 @@ class _AccountBody extends ConsumerWidget {
                       title: const Text('Offline maps'),
                       subtitle: const Text('Areas saved on this phone'),
                       trailing: chevron(),
-                      onTap: () => showOfflineSheet(context),
+                      // Back to the map, which opens the sheet: framing an area needs the map
+                      onTap: () {
+                        final router = GoRouter.of(context);
+                        router.canPop() ? router.pop() : router.go('/');
+                        ref.read(offlineSheetRequestProvider.notifier).open();
+                      },
                     ),
                     ListTile(
                       leading: const TileIcon(Icons.lock_outline),

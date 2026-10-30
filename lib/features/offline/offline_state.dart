@@ -84,6 +84,21 @@ class OfflineState {
 
 final offlineProvider = NotifierProvider<OfflineController, OfflineState>(OfflineController.new);
 
+/// Asks the map to open the Offline maps sheet: User Account closes first, so the map is in
+/// view when an area is framed for download
+class OfflineSheetRequest extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void open() => state = true;
+
+  /// The map opened it
+  void done() => state = false;
+}
+
+/// True until the map has opened the sheet (kept if the map is not on screen yet)
+final offlineSheetRequestProvider = NotifierProvider<OfflineSheetRequest, bool>(OfflineSheetRequest.new);
+
 /// What a new download would be
 class OfflinePlan {
   const OfflinePlan({

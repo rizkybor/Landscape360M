@@ -14,7 +14,9 @@ const supportEmail = 'contact@jcdigital.co.id';
 
 final appVersionProvider = FutureProvider<String>((ref) async {
   final info = await PackageInfo.fromPlatform();
-  return '${info.version} (${info.buildNumber})';
+  // The same number as the website (package.json there); the build number is for the stores
+  // (without the dev build's "-dev")
+  return info.version.split('-').first;
 });
 
 class AboutScreen extends ConsumerWidget {
@@ -24,6 +26,7 @@ class AboutScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final site = ref.watch(appConfigProvider).apiBaseUrl;
     final version = ref.watch(appVersionProvider).value;
+    final isAdmin = ref.watch(profileProvider.select((p) => p.value?.isAdmin ?? false));
     Widget link(Key key, IconData icon, String title, String path) => ListTile(
       key: key,
       leading: TileIcon(icon),
@@ -67,7 +70,14 @@ class AboutScreen extends ConsumerWidget {
             children: [
               link(const Key('about-privacy'), Icons.shield_outlined, 'Privacy Policy', '/privacy'),
               link(const Key('about-terms'), Icons.description_outlined, 'Terms of Service', '/terms'),
-              link(const Key('about-delete'), Icons.person_remove_outlined, 'Deleting your account', '/delete-account'),
+              // The admin account cannot be deleted (one admin runs the service)
+              if (!isAdmin)
+                link(
+                  const Key('about-delete'),
+                  Icons.person_remove_outlined,
+                  'Deleting your account',
+                  '/delete-account',
+                ),
             ],
           ),
           const Padding(
