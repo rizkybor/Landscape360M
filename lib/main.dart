@@ -9,6 +9,7 @@ import 'core/config/app_config.dart';
 import 'core/providers.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/ui/splash.dart';
 import 'data/supabase/secure_session_storage.dart';
 
 Future<void> main() async {
@@ -62,6 +63,8 @@ class _Landscape360AppState extends State<Landscape360App> {
     theme: buildAppTheme(),
     routerConfig: _router,
     debugShowCheckedModeBanner: false,
+    // The launch screen stays a moment with the app's name, then fades into the map
+    builder: (context, child) => SplashGate(child: child ?? const SizedBox.shrink()),
   );
 }
 

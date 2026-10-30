@@ -68,6 +68,15 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
+  // Offline maps asked for from User Account: opened once the map is on screen
+  void _openRequestedOfflineSheet() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !ref.read(offlineSheetRequestProvider)) return;
+      ref.read(offlineSheetRequestProvider.notifier).done();
+      unawaited(showOfflineSheet(context));
+    });
+  }
+
   final _sheet = DraggableScrollableController();
   double? _contentHeight;
   double _headerHeight = mapSheetPeekHeight;
@@ -85,6 +94,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void initState() {
     super.initState();
     _sheet.addListener(_onSheetMoved);
+    // Asked for before the map was on screen (User Account opened on its own)
+    if (ref.read(offlineSheetRequestProvider)) _openRequestedOfflineSheet();
   }
 
   @override
@@ -232,6 +243,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
     }
 
+    // Offline maps asked for from User Account (which has closed): the sheet opens over the map
+    ref.listen(offlineSheetRequestProvider, (_, asked) {
+      if (asked) _openRequestedOfflineSheet();
+    });
     ref
       ..listen(routePlannerProvider.select((s) => s.enabled), lowerSheet)
       ..listen(navigatorProvider.select((s) => s.enabled), lowerSheet)

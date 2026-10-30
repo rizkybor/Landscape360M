@@ -62,7 +62,7 @@ void main() {
     PackageInfo.setMockInitialValues(
       appName: 'Landscape 360',
       packageName: 'id.co.jcdigital.landscape360',
-      version: '1.0.0',
+      version: '3.3.0-dev',
       buildNumber: '7',
       buildSignature: '',
     );
@@ -156,15 +156,18 @@ void main() {
     expect(find.text('Your account has been deleted.'), findsOneWidget);
   });
 
-  testWidgets('the admin account has no Delete account', (tester) async {
+  testWidgets('the admin account has no Delete account, here or in About', (tester) async {
     await pump(tester, admin: true);
     expect(find.byKey(const Key('delete-account')), findsNothing);
     expect(find.byKey(const Key('account-about')), findsOneWidget);
+    await pump(tester, admin: true, start: '/about');
+    expect(find.byKey(const Key('about-privacy')), findsOneWidget);
+    expect(find.byKey(const Key('about-delete')), findsNothing);
   });
 
   testWidgets('About: version, legal pages and support', (tester) async {
     await pump(tester, start: '/about');
-    expect(find.text('Version 1.0.0 (7)'), findsOneWidget);
+    expect(find.text('Version 3.3.0'), findsOneWidget, reason: 'the website\'s number, no build or flavour');
     for (final k in ['about-privacy', 'about-terms', 'about-delete', 'about-reviews', 'about-support']) {
       expect(find.byKey(Key(k)), findsOneWidget, reason: k);
     }
