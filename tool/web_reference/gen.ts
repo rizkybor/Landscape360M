@@ -4,6 +4,8 @@ import * as A from 'WEB/src/utils/markedAreas';
 import * as T from 'WEB/src/utils/trackRecorderGeo';
 import * as L from 'WEB/src/lib/shareLocation';
 import * as Tiles from 'WEB/src/utils/tileUtils';
+import * as C from 'WEB/src/utils/classicNav';
+import * as CS from 'WEB/src/utils/classicSolve';
 
 type LL = [number, number];
 const pairs: [number, number, number, number][] = [
@@ -95,4 +97,157 @@ const tileBoxes: [Tiles.Bounds, number, number][] = [
 ];
 const tiles = tileBoxes.map(([b, min, max]) => ({ bounds: b, min, max, count: Tiles.getTilesInBounds(b, min, max).length }));
 
-console.log(JSON.stringify({ geodesic, az, snap, lines, handles, dms, utm, fmt, areas, hav, share, tiles }, null, 1));
+// Classic: resection / intersection practice (classicNav.ts, classicSolve.ts)
+const dmsCases = [
+  ['7', '27', '16.92'], ['110', '26', '23.28'], ['', '', ''], ['', '5', ''], ['7.5', '0', '0'], ['7', '60', '0'],
+  ['7', '0', '60'], ['91', '0', '0'], ['-7', '0', '0'], ['a', '0', '0'], ['359', '59', '59.99'], ['360', '0', '0'],
+  ['12', '', ''], [' 6 ', '4,5', ''], ['6', '4', '5,25'],
+].map(([d, m, s]) => ({ d, m, s }));
+const classicDms = dmsCases.flatMap((input) =>
+  ([90, 180, 360] as const).map((max) => ({ input, max, out: C.parseDms(input, max, 'latitude') })),
+);
+const classicToDms = [-7.45470, 110.43980, 0, 0.0000013, 59.999999, -0.5, 106.98321].map((v) => ({ v, out: C.toDmsInput(v) }));
+const classicCompass = ['', '114', '114.5', '114,5', '360', '0', '-5', '400', 'abc', '45°', ' 12 '].map((t) => ({ t, out: C.parseCompass(t, 'azimuth') }));
+const classicFormat = [0, 59.96, 359.96, -10, 720.25, 114.44, 11.25, 22.5, 33.74].map((v) => ({
+  v,
+  fmt: C.formatCompass(v),
+  point: C.compassPoint(v),
+  back: C.backAzimuthOf(v),
+  diff: C.angleDiff(v, 350),
+}));
+const classicHints = ['N', 'NNE', 'ENE', 'S', 'WSW', 'NNW'].map((p) => ({ p, hint: C.compassPointHint(p) }));
+const backChecks = [
+  [240, 60], [60, 60], [240.5, 60.5], [240.7, 60.5], [200, 60], [30, 210], [30.04, 210], [0, 180], [181, 1],
+].map(([back, az]) => ({ back, az, out: C.checkBackAzimuth(back, az) }));
+const lineSets: C.Line[][] = [
+  [{ from: [110.43, -7.46], bearing: 45 }, { from: [110.45, -7.46], bearing: 315 }],
+  [{ from: [110.43, -7.46], bearing: 10 }, { from: [110.45, -7.46], bearing: 350 }],
+  [{ from: [110.43, -7.46], bearing: 45 }, { from: [110.45, -7.46], bearing: 315 }, { from: [110.44, -7.48], bearing: 2 }],
+  [{ from: [106.98, -6.78], bearing: 90 }, { from: [106.98, -6.79], bearing: 90 }],
+  [
+    { from: [110.43, -7.46], bearing: 45 }, { from: [110.45, -7.46], bearing: 315 },
+    { from: [110.44, -7.48], bearing: 0 }, { from: [110.42, -7.44], bearing: 120 },
+  ],
+  [{ from: [110.43, -7.46], bearing: 225 }, { from: [110.45, -7.46], bearing: 135 }],
+];
+const classicFix = lineSets.map((lines) => {
+  const fix = C.fixFromLines(lines);
+  return {
+    lines,
+    fix,
+    radius: fix ? C.fixRadius(fix) : null,
+    review: fix ? C.reviewFix(fix, lines, 'intersection', lines.map((_, i) => `position ${String.fromCharCode(65 + i)}`)) : null,
+  };
+});
+const classicAlong = [
+  [[110.43, -7.46], 45, [110.44, -7.45]],
+  [[110.43, -7.46], 45, [110.42, -7.47]],
+  [[106.98, -6.78], 270, [106.97, -6.781]],
+].map(([from, bearing, to]) => ({ from, bearing, to, out: C.lengthAlong(from as LL, bearing as number, to as LL) }));
+
+const P = (lat: [string, string, string], lng: [string, string, string], south = true, west = false) => ({
+  lat: { d: lat[0], m: lat[1], s: lat[2] },
+  lng: { d: lng[0], m: lng[1], s: lng[2] },
+  south,
+  west,
+});
+const blank = P(['', '', ''], ['', '', '']);
+const sg = (point: ReturnType<typeof P>, azimuth: string, back: string, azChecks: number, backChecks: number) => ({
+  point,
+  azimuth,
+  back,
+  azChecks,
+  backChecks,
+});
+const solveCases = [
+  // Resection: position set, A done, B half done
+  {
+    mode: 'resection',
+    origin: P(['7', '27', '16.92'], ['110', '26', '23.28']),
+    declination: '0',
+    sightings: [sg(blank, '60', '240', 1, 1), sg(blank, '150', '', 1, 0)],
+  },
+  // Resection without a position: nothing opens
+  { mode: 'resection', origin: blank, declination: '', sightings: [sg(blank, '60', '', 0, 0), sg(blank, '', '', 0, 0)] },
+  // Resection, wrong back azimuth twice: the answer shows
+  {
+    mode: 'resection',
+    origin: P(['7', '27', '0'], ['110', '26', '0']),
+    declination: '0.8',
+    sightings: [sg(blank, '60', '200', 1, 2), sg(blank, '', '', 0, 0)],
+  },
+  // Intersection, two positions, a fix
+  {
+    mode: 'intersection',
+    origin: blank,
+    declination: '0',
+    sightings: [
+      sg(P(['7', '27', '36'], ['110', '25', '48']), '45', '225', 1, 1),
+      sg(P(['7', '27', '36'], ['110', '27', '0']), '315', '135', 1, 1),
+    ],
+  },
+  // Intersection with declination and a third position
+  {
+    mode: 'intersection',
+    origin: blank,
+    declination: '-1.2',
+    sightings: [
+      sg(P(['7', '27', '36'], ['110', '25', '48']), '45', '225', 1, 1),
+      sg(P(['7', '27', '36'], ['110', '27', '0']), '315', '135', 1, 1),
+      sg(P(['7', '28', '48'], ['110', '26', '24']), '3', '183', 1, 1),
+    ],
+  },
+  // Intersection: the lines meet behind position A
+  {
+    mode: 'intersection',
+    origin: blank,
+    declination: '0',
+    sightings: [
+      sg(P(['7', '27', '36'], ['110', '25', '48']), '225', '45', 1, 1),
+      sg(P(['7', '27', '36'], ['110', '27', '0']), '135', '315', 1, 1),
+    ],
+  },
+  // Intersection: parallel lines; and positions too close; and a bad declination
+  {
+    mode: 'intersection',
+    origin: blank,
+    declination: '0',
+    sightings: [
+      sg(P(['7', '27', '36'], ['110', '25', '48']), '90', '270', 1, 1),
+      sg(P(['7', '28', '36'], ['110', '25', '48']), '90', '270', 1, 1),
+    ],
+  },
+  {
+    mode: 'intersection',
+    origin: blank,
+    declination: '45',
+    sightings: [
+      sg(P(['7', '27', '36'], ['110', '25', '48']), '45', '', 1, 0),
+      sg(P(['7', '27', '36.5'], ['110', '25', '48']), '', '', 0, 0),
+    ],
+  },
+  {
+    mode: 'intersection',
+    origin: blank,
+    declination: '0',
+    sightings: [sg(P(['7', '27', ''], ['', '', '']), '', '', 0, 0), sg(blank, '', '', 0, 0)],
+  },
+];
+const classicSolve = solveCases.map((c) => ({
+  input: c,
+  out: CS.solveClassic(c as Parameters<typeof CS.solveClassic>[0]),
+}));
+const classic = {
+  dms: classicDms,
+  toDms: classicToDms,
+  compass: classicCompass,
+  format: classicFormat,
+  hints: classicHints,
+  points: C.COMPASS_POINTS,
+  backChecks,
+  fix: classicFix,
+  along: classicAlong,
+  solve: classicSolve,
+};
+
+console.log(JSON.stringify({ geodesic, az, snap, lines, handles, dms, utm, fmt, areas, hav, share, tiles, classic }, null, 1));

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../data/marked/marked_area_repository.dart';
 import '../../domain/geo/spherical.dart';
+import '../../domain/marked/area_contours.dart';
 import '../../domain/marked/marked_areas.dart';
 import '../map/map_tools_state.dart';
 
@@ -51,6 +52,8 @@ class AreasState {
     this.form,
     this.focusId,
     this.selectedId,
+    this.contourMeta = const {},
+    this.shownContours = const {},
   });
 
   final String? userId;
@@ -63,6 +66,14 @@ class AreasState {
   final AreaForm? form;
   final String? focusId; // everything outside this area is darkened
   final String? selectedId;
+  final Map<String, AreaContourMeta> contourMeta; // areas with contours uploaded on the website
+  final Map<String, Map<String, dynamic>> shownContours; // their lines on the map
+
+  /// The contour sets on the map, each with its interval
+  List<ContourSet> get contourSets => [
+    for (final MapEntry(key: id, value: data) in shownContours.entries)
+      (data: data, intervalM: contourMeta[id]?.intervalM),
+  ];
 
   MarkedArea? get focused => areas.where((a) => a.id == focusId).firstOrNull;
 
@@ -76,6 +87,8 @@ class AreasState {
     AreaForm? Function()? form,
     String? Function()? focusId,
     String? Function()? selectedId,
+    Map<String, AreaContourMeta>? contourMeta,
+    Map<String, Map<String, dynamic>>? shownContours,
   }) => AreasState(
     userId: userId,
     panelOpen: panelOpen ?? this.panelOpen,
@@ -87,6 +100,8 @@ class AreasState {
     form: form == null ? this.form : form(),
     focusId: focusId == null ? this.focusId : focusId(),
     selectedId: selectedId == null ? this.selectedId : selectedId(),
+    contourMeta: contourMeta ?? this.contourMeta,
+    shownContours: shownContours ?? this.shownContours,
   );
 }
 
@@ -133,8 +148,13 @@ class AreasController extends Notifier<AreasState> {
     if (userId == null) return;
     state = state.copyWith(loading: true);
     try {
-      final areas = await _cloud.mine(userId);
-      if (state.userId == userId) state = state.copyWith(areas: areas, error: () => null);
+      final (areas, meta) = await (
+        _cloud.mine(userId),
+        _cloud.contourMeta(userId).catchError((Object _) => const <AreaContourMeta>[]),
+      ).wait;
+      if (state.userId == userId) {
+        state = state.copyWith(areas: areas, contourMeta: {for (final m in meta) m.areaId: m}, error: () => null);
+      }
     } on Object catch (e) {
       if (state.userId == userId) state = state.copyWith(error: () => '$e');
     } finally {
@@ -208,6 +228,8 @@ class AreasController extends Notifier<AreasState> {
     await _cloud.delete(id);
     state = state.copyWith(
       areas: state.areas.where((a) => a.id != id).toList(),
+      contourMeta: {...state.contourMeta}..remove(id),
+      shownContours: {...state.shownContours}..remove(id),
       focusId: state.focusId == id ? () => null : null,
       selectedId: state.selectedId == id ? () => null : null,
     );
@@ -220,5 +242,18 @@ class AreasController extends Notifier<AreasState> {
     state = state.copyWith(focusId: () => id);
     final a = state.focused;
     if (a != null) ref.read(fitPointsProvider.notifier).go(a.ring);
+    // Focusing an area with uploaded contours shows them
+    if (id != null && state.contourMeta.containsKey(id)) unawaited(showContours(id).catchError((Object _) {}));
   }
+
+  // --- Contours uploaded on the website
+
+  Future<void> showContours(String id) async {
+    if (state.shownContours.containsKey(id) || !state.contourMeta.containsKey(id)) return;
+    final data = await _cloud.contours(id);
+    if (!state.contourMeta.containsKey(id)) return;
+    state = state.copyWith(shownContours: {...state.shownContours, id: data});
+  }
+
+  void hideContours(String id) => state = state.copyWith(shownContours: {...state.shownContours}..remove(id));
 }

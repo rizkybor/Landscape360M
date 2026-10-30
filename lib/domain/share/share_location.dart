@@ -95,6 +95,19 @@ String buildAreaShareText({
   required String url,
 }) => ['🗺️ $name', 'Area $size · perimeter $perimeter', 'Open on Landscape 360 (no sign-in needed): $url'].join('\n');
 
+/// Link to a shared Classic Field Work: /?classic=<32-character token>
+String classicLinkUrl(String token, [String base = siteUrl]) => '$base/?classic=$token';
+
+/// The token in a "?classic=" query, or null
+String? parseClassicToken(String search) {
+  final token = queryParam(search, 'classic');
+  return token != null && _token.hasMatch(token) ? token : null;
+}
+
+/// The WhatsApp message for a shared Field Work (ClassicPanel.tsx)
+String buildClassicShareText({required String name, required String mode, required String url}) =>
+    '🧭 $name (${mode[0].toUpperCase()}${mode.substring(1)} practice)\nOpen on Landscape 360 (no sign-in needed): $url';
+
 /// WhatsApp with the message filled in (the user picks the chat)
 String whatsappShareUrl(String text) => 'https://wa.me/?text=${Uri.encodeComponent(text)}';
 
@@ -108,6 +121,8 @@ sealed class IncomingLink {
     if (uri.scheme != 'https' || uri.host != host) return null;
     if (uri.path.isNotEmpty && uri.path != '/') return null;
     final search = uri.query;
+    final classic = parseClassicToken(search);
+    if (classic != null) return ClassicLink(classic);
     final area = parseAreaToken(search);
     if (area != null) return AreaLink(area);
     final place = parsePlaceToken(search);
@@ -125,6 +140,11 @@ class PointLink extends IncomingLink {
 
 class PlaceLink extends IncomingLink {
   const PlaceLink(this.token);
+  final String token;
+}
+
+class ClassicLink extends IncomingLink {
+  const ClassicLink(this.token);
   final String token;
 }
 

@@ -52,6 +52,9 @@ shows "Request failed (404)".
    }
    ```
 
+   Links to a shared Classic Field Work (`?classic=`) open in the app too: the file
+   here lists them. If the web's copy was made before, add this line to its
+   `components`: `{ "/": "/", "?": { "classic": "*" }, "comment": "Shared Classic Field Work" }`.
 5. Check after deploying:
    - `curl -I https://landscape360.jcdigital.co.id/.well-known/apple-app-site-association`
      answers 200 with `content-type: application/json`, without redirects

@@ -24,6 +24,9 @@ import '../areas/area_layer.dart';
 import '../areas/area_panel.dart';
 import '../areas/area_state.dart';
 import '../basemaps/basemap_state.dart';
+import '../classic/classic_overlay.dart';
+import '../classic/classic_panel.dart';
+import '../classic/classic_state.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
 import '../marked/marked_layer.dart';
@@ -235,10 +238,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ..listen(trackRecorderProvider.select((s) => s.panelOpen), lowerSheet)
       ..listen(mapSettingsProvider.select((s) => s.showPois), lowerSheet)
       ..listen(areasProvider.select((s) => s.panelOpen || s.drawing), lowerSheet)
-      ..listen(offlineProvider.select((s) => s.framing), lowerSheet);
+      ..listen(offlineProvider.select((s) => s.framing), lowerSheet)
+      ..listen(classicProvider.select((s) => s.panelOpen), lowerSheet);
     final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
+    final classicOpen = ref.watch(classicProvider.select((s) => s.panelOpen));
     final recordingHidden = !trackOpen && ref.watch(trackRecorderProvider.select((s) => s.active != null));
     final liveOn = ref.watch(liveTrackingProvider.select((s) => s.on));
     final sosAlerts = ref.watch(sosAlertsProvider.select((s) => s.active.isNotEmpty));
@@ -349,6 +354,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         if (navigatorOpen)
                           NavigatorPanel(onShowSurvey: (doc) => ref.read(showSurveyProvider.notifier).show(doc)),
                         if (trackOpen) const TrackRecorderPanel(),
+                        if (classicOpen) const ClassicPanel(),
                       ],
                     ),
                   ),
@@ -516,7 +522,11 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   Future<void> _showAreas() async {
     final link = ref.read(sharedLinkProvider);
     final linked = link is SharedArea && link.area != null ? (ring: link.area!.ring, color: link.area!.color) : null;
-    await _areaLayer?.show(ref.read(areasProvider), linked: linked);
+    await _areaLayer?.show(
+      ref.read(areasProvider),
+      linked: linked,
+      linkedContours: link is SharedArea ? link.contours : null,
+    );
   }
 
   /// Points in view above the panels (fitBounds, max zoom 17)
@@ -535,6 +545,12 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   /// A tap for the open drawing tool; false when none is open
   bool _toolTap(double lng, double lat) {
+    // Classic, Pick on map: this tap places the position
+    if (ref.read(classicProvider).picking != null) {
+      HapticFeedback.lightImpact();
+      ref.read(classicProvider.notifier).placePicked((lng, lat));
+      return true;
+    }
     // Drawing a marked area: each tap adds a corner
     if (ref.read(areasProvider).drawing) {
       HapticFeedback.lightImpact();
@@ -867,7 +883,8 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     _puckOn = true;
     await map.location.updateSettings(
       LocationComponentSettings(
-        enabled: true,
+        // Hidden while Classic is open: in a resection your position is the answer
+        enabled: !ref.read(classicProvider).panelOpen,
         locationPuck: puck,
         showAccuracyRing: true,
         accuracyRingColor: 0x1AE46C24,
@@ -1048,6 +1065,12 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
         ),
       );
     });
+    // The GPS dot hides while Classic is open (it would give a resection away) and comes back
+    ref.listen<bool>(classicProvider.select((s) => s.panelOpen), (_, open) {
+      final map = _map;
+      if (map == null || !_puckOn) return;
+      unawaited(map.location.updateSettings(LocationComponentSettings(enabled: !open)).catchError((Object _) {}));
+    });
     ref.listen<MapSettings>(mapSettingsProvider, (prev, next) {
       final map = _map;
       if (map == null || prev == null) return;
@@ -1105,6 +1128,15 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
               cameraTick: _cameraTick,
               styleTick: _styleTick,
               elevationAt: _elevationAt,
+            ),
+          ),
+        if (_map != null)
+          Positioned.fill(
+            child: ClassicOverlay(
+              map: _map!,
+              cameraTick: _cameraTick,
+              styleTick: _styleTick,
+              bottomInset: widget.sheetInset,
             ),
           ),
         Positioned(

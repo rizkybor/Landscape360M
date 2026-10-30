@@ -2633,5 +2633,2479 @@
    "max": 12,
    "count": 15
   }
- ]
+ ],
+ "classic": {
+  "dms": [
+   {
+    "input": {
+     "d": "7",
+     "m": "27",
+     "s": "16.92"
+    },
+    "max": 90,
+    "out": {
+     "value": 7.4547,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "27",
+     "s": "16.92"
+    },
+    "max": 180,
+    "out": {
+     "value": 7.4547,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "27",
+     "s": "16.92"
+    },
+    "max": 360,
+    "out": {
+     "value": 7.4547,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "110",
+     "m": "26",
+     "s": "23.28"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "The latitude cannot be more than 90°."
+    }
+   },
+   {
+    "input": {
+     "d": "110",
+     "m": "26",
+     "s": "23.28"
+    },
+    "max": 180,
+    "out": {
+     "value": 110.4398,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "110",
+     "m": "26",
+     "s": "23.28"
+    },
+    "max": 360,
+    "out": {
+     "value": 110.4398,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "",
+     "m": "",
+     "s": ""
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "",
+     "m": "",
+     "s": ""
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "",
+     "m": "",
+     "s": ""
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "",
+     "m": "5",
+     "s": ""
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "Enter the degrees of the latitude."
+    }
+   },
+   {
+    "input": {
+     "d": "",
+     "m": "5",
+     "s": ""
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "Enter the degrees of the latitude."
+    }
+   },
+   {
+    "input": {
+     "d": "",
+     "m": "5",
+     "s": ""
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "Enter the degrees of the latitude."
+    }
+   },
+   {
+    "input": {
+     "d": "7.5",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "Degrees and minutes are whole numbers; put the fraction in the seconds."
+    }
+   },
+   {
+    "input": {
+     "d": "7.5",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "Degrees and minutes are whole numbers; put the fraction in the seconds."
+    }
+   },
+   {
+    "input": {
+     "d": "7.5",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "Degrees and minutes are whole numbers; put the fraction in the seconds."
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "60",
+     "s": "0"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "Minutes go from 0 to 59 (60' is 1°)."
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "60",
+     "s": "0"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "Minutes go from 0 to 59 (60' is 1°)."
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "60",
+     "s": "0"
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "Minutes go from 0 to 59 (60' is 1°)."
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "0",
+     "s": "60"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "Seconds go from 0 to 59.99 (60\" is 1')."
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "0",
+     "s": "60"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "Seconds go from 0 to 59.99 (60\" is 1')."
+    }
+   },
+   {
+    "input": {
+     "d": "7",
+     "m": "0",
+     "s": "60"
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "Seconds go from 0 to 59.99 (60\" is 1')."
+    }
+   },
+   {
+    "input": {
+     "d": "91",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "The latitude cannot be more than 90°."
+    }
+   },
+   {
+    "input": {
+     "d": "91",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 180,
+    "out": {
+     "value": 91,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "91",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 360,
+    "out": {
+     "value": 91,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "-7",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "No minus signs: the direction comes from N/S or E/W."
+    }
+   },
+   {
+    "input": {
+     "d": "-7",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "No minus signs: the direction comes from N/S or E/W."
+    }
+   },
+   {
+    "input": {
+     "d": "-7",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "No minus signs: the direction comes from N/S or E/W."
+    }
+   },
+   {
+    "input": {
+     "d": "a",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "Use numbers only in the latitude."
+    }
+   },
+   {
+    "input": {
+     "d": "a",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "Use numbers only in the latitude."
+    }
+   },
+   {
+    "input": {
+     "d": "a",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "Use numbers only in the latitude."
+    }
+   },
+   {
+    "input": {
+     "d": "359",
+     "m": "59",
+     "s": "59.99"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "The latitude cannot be more than 90°."
+    }
+   },
+   {
+    "input": {
+     "d": "359",
+     "m": "59",
+     "s": "59.99"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "The latitude cannot be more than 180°."
+    }
+   },
+   {
+    "input": {
+     "d": "359",
+     "m": "59",
+     "s": "59.99"
+    },
+    "max": 360,
+    "out": {
+     "value": 359.99999722222225,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "360",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "The latitude cannot be more than 90°."
+    }
+   },
+   {
+    "input": {
+     "d": "360",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "The latitude cannot be more than 180°."
+    }
+   },
+   {
+    "input": {
+     "d": "360",
+     "m": "0",
+     "s": "0"
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "A bearing goes from 0° to 359° 59' 59\". 360° is north again, so write 0°."
+    }
+   },
+   {
+    "input": {
+     "d": "12",
+     "m": "",
+     "s": ""
+    },
+    "max": 90,
+    "out": {
+     "value": 12,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "12",
+     "m": "",
+     "s": ""
+    },
+    "max": 180,
+    "out": {
+     "value": 12,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "12",
+     "m": "",
+     "s": ""
+    },
+    "max": 360,
+    "out": {
+     "value": 12,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": " 6 ",
+     "m": "4,5",
+     "s": ""
+    },
+    "max": 90,
+    "out": {
+     "value": null,
+     "error": "Degrees and minutes are whole numbers; put the fraction in the seconds."
+    }
+   },
+   {
+    "input": {
+     "d": " 6 ",
+     "m": "4,5",
+     "s": ""
+    },
+    "max": 180,
+    "out": {
+     "value": null,
+     "error": "Degrees and minutes are whole numbers; put the fraction in the seconds."
+    }
+   },
+   {
+    "input": {
+     "d": " 6 ",
+     "m": "4,5",
+     "s": ""
+    },
+    "max": 360,
+    "out": {
+     "value": null,
+     "error": "Degrees and minutes are whole numbers; put the fraction in the seconds."
+    }
+   },
+   {
+    "input": {
+     "d": "6",
+     "m": "4",
+     "s": "5,25"
+    },
+    "max": 90,
+    "out": {
+     "value": 6.068124999999999,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "6",
+     "m": "4",
+     "s": "5,25"
+    },
+    "max": 180,
+    "out": {
+     "value": 6.068124999999999,
+     "error": null
+    }
+   },
+   {
+    "input": {
+     "d": "6",
+     "m": "4",
+     "s": "5,25"
+    },
+    "max": 360,
+    "out": {
+     "value": 6.068124999999999,
+     "error": null
+    }
+   }
+  ],
+  "toDms": [
+   {
+    "v": -7.4547,
+    "out": {
+     "d": "7",
+     "m": "27",
+     "s": "16.92"
+    }
+   },
+   {
+    "v": 110.4398,
+    "out": {
+     "d": "110",
+     "m": "26",
+     "s": "23.28"
+    }
+   },
+   {
+    "v": 0,
+    "out": {
+     "d": "0",
+     "m": "0",
+     "s": "0"
+    }
+   },
+   {
+    "v": 0.0000013,
+    "out": {
+     "d": "0",
+     "m": "0",
+     "s": "0"
+    }
+   },
+   {
+    "v": 59.999999,
+    "out": {
+     "d": "60",
+     "m": "0",
+     "s": "0"
+    }
+   },
+   {
+    "v": -0.5,
+    "out": {
+     "d": "0",
+     "m": "30",
+     "s": "0"
+    }
+   },
+   {
+    "v": 106.98321,
+    "out": {
+     "d": "106",
+     "m": "58",
+     "s": "59.56"
+    }
+   }
+  ],
+  "compass": [
+   {
+    "t": "",
+    "out": {
+     "value": null,
+     "error": null
+    }
+   },
+   {
+    "t": "114",
+    "out": {
+     "value": 114,
+     "error": null
+    }
+   },
+   {
+    "t": "114.5",
+    "out": {
+     "value": 114.5,
+     "error": null
+    }
+   },
+   {
+    "t": "114,5",
+    "out": {
+     "value": 114.5,
+     "error": null
+    }
+   },
+   {
+    "t": "360",
+    "out": {
+     "value": 0,
+     "error": null
+    }
+   },
+   {
+    "t": "0",
+    "out": {
+     "value": 0,
+     "error": null
+    }
+   },
+   {
+    "t": "-5",
+    "out": {
+     "value": null,
+     "error": "A compass has no negative degrees: go clockwise from north, 0 to 360."
+    }
+   },
+   {
+    "t": "400",
+    "out": {
+     "value": null,
+     "error": "A compass goes from 0° to 360°. Subtract 360° from 400°."
+    }
+   },
+   {
+    "t": "abc",
+    "out": {
+     "value": null,
+     "error": "Type the azimuth as compass degrees, e.g. 114 or 114.5."
+    }
+   },
+   {
+    "t": "45°",
+    "out": {
+     "value": 45,
+     "error": null
+    }
+   },
+   {
+    "t": " 12 ",
+    "out": {
+     "value": 12,
+     "error": null
+    }
+   }
+  ],
+  "format": [
+   {
+    "v": 0,
+    "fmt": "0°",
+    "point": "N",
+    "back": 180,
+    "diff": 10
+   },
+   {
+    "v": 59.96,
+    "fmt": "60°",
+    "point": "ENE",
+    "back": 239.96000000000004,
+    "diff": 69.95999999999998
+   },
+   {
+    "v": 359.96,
+    "fmt": "0°",
+    "point": "N",
+    "back": 179.96000000000004,
+    "diff": 9.95999999999998
+   },
+   {
+    "v": -10,
+    "fmt": "350°",
+    "point": "N",
+    "back": 170,
+    "diff": 0
+   },
+   {
+    "v": 720.25,
+    "fmt": "0.3°",
+    "point": "N",
+    "back": 180.25,
+    "diff": 10.25
+   },
+   {
+    "v": 114.44,
+    "fmt": "114.4°",
+    "point": "ESE",
+    "back": 294.44000000000005,
+    "diff": 124.44
+   },
+   {
+    "v": 11.25,
+    "fmt": "11.3°",
+    "point": "NNE",
+    "back": 191.25,
+    "diff": 21.25
+   },
+   {
+    "v": 22.5,
+    "fmt": "22.5°",
+    "point": "NNE",
+    "back": 202.5,
+    "diff": 32.5
+   },
+   {
+    "v": 33.74,
+    "fmt": "33.7°",
+    "point": "NNE",
+    "back": 213.74,
+    "diff": 43.74000000000001
+   }
+  ],
+  "hints": [
+   {
+    "p": "N",
+    "hint": "N = Utara (North), sekitar 349°–11°"
+   },
+   {
+    "p": "NNE",
+    "hint": "NNE = Utara-Timur Laut (North-NorthEast), sekitar 12°–33°"
+   },
+   {
+    "p": "ENE",
+    "hint": "ENE = Timur-Timur Laut (East-NorthEast), sekitar 57°–78°"
+   },
+   {
+    "p": "S",
+    "hint": "S = Selatan (South), sekitar 169°–191°"
+   },
+   {
+    "p": "WSW",
+    "hint": "WSW = Barat-Barat Daya (West-SouthWest), sekitar 237°–258°"
+   },
+   {
+    "p": "NNW",
+    "hint": "NNW = Utara-Barat Laut (North-NorthWest), sekitar 327°–348°"
+   }
+  ],
+  "points": [
+   {
+    "abbr": "N",
+    "deg": 0,
+    "id": "Utara"
+   },
+   {
+    "abbr": "NNE",
+    "deg": 22.5,
+    "id": "Utara-Timur Laut"
+   },
+   {
+    "abbr": "NE",
+    "deg": 45,
+    "id": "Timur Laut"
+   },
+   {
+    "abbr": "ENE",
+    "deg": 67.5,
+    "id": "Timur-Timur Laut"
+   },
+   {
+    "abbr": "E",
+    "deg": 90,
+    "id": "Timur"
+   },
+   {
+    "abbr": "ESE",
+    "deg": 112.5,
+    "id": "Timur-Tenggara"
+   },
+   {
+    "abbr": "SE",
+    "deg": 135,
+    "id": "Tenggara"
+   },
+   {
+    "abbr": "SSE",
+    "deg": 157.5,
+    "id": "Selatan-Tenggara"
+   },
+   {
+    "abbr": "S",
+    "deg": 180,
+    "id": "Selatan"
+   },
+   {
+    "abbr": "SSW",
+    "deg": 202.5,
+    "id": "Selatan-Barat Daya"
+   },
+   {
+    "abbr": "SW",
+    "deg": 225,
+    "id": "Barat Daya"
+   },
+   {
+    "abbr": "WSW",
+    "deg": 247.5,
+    "id": "Barat-Barat Daya"
+   },
+   {
+    "abbr": "W",
+    "deg": 270,
+    "id": "Barat"
+   },
+   {
+    "abbr": "WNW",
+    "deg": 292.5,
+    "id": "Barat-Barat Laut"
+   },
+   {
+    "abbr": "NW",
+    "deg": 315,
+    "id": "Barat Laut"
+   },
+   {
+    "abbr": "NNW",
+    "deg": 337.5,
+    "id": "Utara-Barat Laut"
+   }
+  ],
+  "backChecks": [
+   {
+    "back": 240,
+    "az": 60,
+    "out": {
+     "verdict": "ok",
+     "message": "Correct."
+    }
+   },
+   {
+    "back": 60,
+    "az": 60,
+    "out": {
+     "verdict": "off",
+     "message": "That is the azimuth itself. The back azimuth points the opposite way."
+    }
+   },
+   {
+    "back": 240.5,
+    "az": 60.5,
+    "out": {
+     "verdict": "ok",
+     "message": "Correct."
+    }
+   },
+   {
+    "back": 240.7,
+    "az": 60.5,
+    "out": {
+     "verdict": "off",
+     "message": "The whole degrees are right. Keep the decimals exactly as in the azimuth."
+    }
+   },
+   {
+    "back": 200,
+    "az": 60,
+    "out": {
+     "verdict": "off",
+     "message": "60° is less than 180°, so add 180°."
+    }
+   },
+   {
+    "back": 30,
+    "az": 210,
+    "out": {
+     "verdict": "ok",
+     "message": "Correct."
+    }
+   },
+   {
+    "back": 30.04,
+    "az": 210,
+    "out": {
+     "verdict": "ok",
+     "message": "Correct."
+    }
+   },
+   {
+    "back": 0,
+    "az": 180,
+    "out": {
+     "verdict": "ok",
+     "message": "Correct."
+    }
+   },
+   {
+    "back": 181,
+    "az": 1,
+    "out": {
+     "verdict": "ok",
+     "message": "Correct."
+    }
+   }
+  ],
+  "fix": [
+   {
+    "lines": [
+     {
+      "from": [
+       110.43,
+       -7.46
+      ],
+      "bearing": 45
+     },
+     {
+      "from": [
+       110.45,
+       -7.46
+      ],
+      "bearing": 315
+     }
+    ],
+    "fix": {
+     "point": [
+      110.44,
+      -7.4500187139690315
+     ],
+     "along": [
+      1561.0935316034934,
+      1561.093531603494
+     ],
+     "misses": [
+      1.1368683772161603e-13,
+      0
+     ],
+     "cutAngle": 90
+    },
+    "radius": 54.51458737218402,
+    "review": []
+   },
+   {
+    "lines": [
+     {
+      "from": [
+       110.43,
+       -7.46
+      ],
+      "bearing": 10
+     },
+     {
+      "from": [
+       110.45,
+       -7.46
+      ],
+      "bearing": 350
+     }
+    ],
+    "fix": {
+     "point": [
+      110.44,
+      -7.403387229231346
+     ],
+     "along": [
+      6357.545354478175,
+      6357.545354478176
+     ],
+     "misses": [
+      2.2737367544323206e-13,
+      0
+     ],
+     "cutAngle": 20
+    },
+    "radius": 649.1149138127446,
+    "review": [
+     {
+      "verdict": "close",
+      "message": "The lines cross at a shallow 20°, so a small reading error moves the answer a lot. Choose positions so the lines meet at 30–150° (seen from the object)."
+     }
+    ]
+   },
+   {
+    "lines": [
+     {
+      "from": [
+       110.43,
+       -7.46
+      ],
+      "bearing": 45
+     },
+     {
+      "from": [
+       110.45,
+       -7.46
+      ],
+      "bearing": 315
+     },
+     {
+      "from": [
+       110.44,
+       -7.48
+      ],
+      "bearing": 2
+     }
+    ],
+    "fix": {
+     "point": [
+      110.44052382750185,
+      -7.450036972616664
+     ],
+     "along": [
+      1600.5528395796587,
+      1518.7784704841938,
+      3313.698842591243
+     ],
+     "misses": [
+      42.31499649449063,
+      39.45937260097469,
+      57.85845672320777
+     ],
+     "cutAngle": 90
+    },
+    "radius": 115.71691344720004,
+    "review": [
+     {
+      "verdict": "off",
+      "message": "The lines cross 232 m apart (the triangle of error). One reading is off: take them again, starting with the one you are least sure of."
+     }
+    ]
+   },
+   {
+    "lines": [
+     {
+      "from": [
+       106.98,
+       -6.78
+      ],
+      "bearing": 90
+     },
+     {
+      "from": [
+       106.98,
+       -6.79
+      ],
+      "bearing": 90
+     }
+    ],
+    "fix": null,
+    "radius": null,
+    "review": null
+   },
+   {
+    "lines": [
+     {
+      "from": [
+       110.43,
+       -7.46
+      ],
+      "bearing": 45
+     },
+     {
+      "from": [
+       110.45,
+       -7.46
+      ],
+      "bearing": 315
+     },
+     {
+      "from": [
+       110.44,
+       -7.48
+      ],
+      "bearing": 0
+     },
+     {
+      "from": [
+       110.42,
+       -7.44
+      ],
+      "bearing": 120
+     }
+    ],
+    "fix": {
+     "point": [
+      110.43982570033856,
+      -7.450621388844179
+     ],
+     "along": [
+      1500.3578088090044,
+      1527.5675790320863,
+      3249.067231326756,
+      2482.6015255689013
+     ],
+     "misses": [
+      33.52381937615098,
+      60.73358959923257,
+      19.24021303848467,
+      76.96085215550681
+     ],
+     "cutAngle": 90
+    },
+    "radius": 115.44127823326022,
+    "review": [
+     {
+      "verdict": "off",
+      "message": "The line from position D misses the others. Its azimuth or back azimuth is the most likely slip."
+     }
+    ]
+   },
+   {
+    "lines": [
+     {
+      "from": [
+       110.43,
+       -7.46
+      ],
+      "bearing": 225
+     },
+     {
+      "from": [
+       110.45,
+       -7.46
+      ],
+      "bearing": 135
+     }
+    ],
+    "fix": {
+     "point": [
+      110.44,
+      -7.4500187139690315
+     ],
+     "along": [
+      -1561.0935316034938,
+      -1561.0935316034938
+     ],
+     "misses": [
+      1.1368683772161603e-13,
+      1.1368683772161603e-13
+     ],
+     "cutAngle": 90
+    },
+    "radius": 54.51458737218401,
+    "review": []
+   }
+  ],
+  "along": [
+   {
+    "from": [
+     110.43,
+     -7.46
+    ],
+    "bearing": 45,
+    "to": [
+     110.44,
+     -7.45
+    ],
+    "out": 1562.5483558543237
+   },
+   {
+    "from": [
+     110.43,
+     -7.46
+    ],
+    "bearing": 45,
+    "to": [
+     110.42,
+     -7.47
+    ],
+    "out": -1562.5309545967143
+   },
+   {
+    "from": [
+     106.98,
+     -6.78
+    ],
+    "bearing": 270,
+    "to": [
+     106.97,
+     -6.781
+    ],
+    "out": 1105.4593829837586
+   }
+  ],
+  "solve": [
+   {
+    "input": {
+     "mode": "resection",
+     "origin": {
+      "lat": {
+       "d": "7",
+       "m": "27",
+       "s": "16.92"
+      },
+      "lng": {
+       "d": "110",
+       "m": "26",
+       "s": "23.28"
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "0",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "60",
+       "back": "240",
+       "azChecks": 1,
+       "backChecks": 1
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "150",
+       "back": "",
+       "azChecks": 1,
+       "backChecks": 0
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "point A",
+       "point": [
+        110.4398,
+        -7.4547
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 60,
+        "error": null
+       },
+       "back": {
+        "value": 240,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      },
+      {
+       "label": "point B",
+       "point": [
+        110.4398,
+        -7.4547
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 150,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": false,
+       "open": true
+      }
+     ],
+     "pointsReady": true,
+     "origin": [
+      110.4398,
+      -7.4547
+     ],
+     "originError": null,
+     "declination": {
+      "value": 0,
+      "error": null
+     },
+     "lines": [],
+     "fix": null,
+     "problem": null,
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "resection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "60",
+       "back": "",
+       "azChecks": 0,
+       "backChecks": 0
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "",
+       "back": "",
+       "azChecks": 0,
+       "backChecks": 0
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "point A",
+       "point": null,
+       "pointError": null,
+       "azimuth": {
+        "value": 60,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": false
+      },
+      {
+       "label": "point B",
+       "point": null,
+       "pointError": null,
+       "azimuth": {
+        "value": null,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": false
+      }
+     ],
+     "pointsReady": false,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": 0,
+      "error": null
+     },
+     "lines": [],
+     "fix": null,
+     "problem": null,
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "resection",
+     "origin": {
+      "lat": {
+       "d": "7",
+       "m": "27",
+       "s": "0"
+      },
+      "lng": {
+       "d": "110",
+       "m": "26",
+       "s": "0"
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "0.8",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "60",
+       "back": "200",
+       "azChecks": 1,
+       "backChecks": 2
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "",
+       "back": "",
+       "azChecks": 0,
+       "backChecks": 0
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "point A",
+       "point": [
+        110.43333333333334,
+        -7.45
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 60,
+        "error": null
+       },
+       "back": {
+        "value": 200,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "off",
+        "message": "60° is less than 180°, so add 180°."
+       },
+       "backAnswer": 240,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": false,
+       "open": true
+      },
+      {
+       "label": "point B",
+       "point": [
+        110.43333333333334,
+        -7.45
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": null,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": false
+      }
+     ],
+     "pointsReady": true,
+     "origin": [
+      110.43333333333334,
+      -7.45
+     ],
+     "originError": null,
+     "declination": {
+      "value": 0.8,
+      "error": null
+     },
+     "lines": [],
+     "fix": null,
+     "problem": null,
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "intersection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "0",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "45",
+       "back": "225",
+       "azChecks": 1,
+       "backChecks": 1
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "27",
+         "s": "0"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "315",
+       "back": "135",
+       "azChecks": 1,
+       "backChecks": 1
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "position A",
+       "point": [
+        110.43,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 45,
+        "error": null
+       },
+       "back": {
+        "value": 225,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      },
+      {
+       "label": "position B",
+       "point": [
+        110.45,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 315,
+        "error": null
+       },
+       "back": {
+        "value": 135,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      }
+     ],
+     "pointsReady": true,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": 0,
+      "error": null
+     },
+     "lines": [
+      {
+       "index": 0,
+       "from": [
+        110.43,
+        -7.46
+       ],
+       "bearing": 45
+      },
+      {
+       "index": 1,
+       "from": [
+        110.45,
+        -7.46
+       ],
+       "bearing": 315
+      }
+     ],
+     "fix": {
+      "point": [
+       110.44,
+       -7.4500187139690315
+      ],
+      "along": [
+       1561.0935316034934,
+       1561.093531603494
+      ],
+      "misses": [
+       1.1368683772161603e-13,
+       0
+      ],
+      "cutAngle": 90
+     },
+     "problem": null,
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "intersection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "-1.2",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "45",
+       "back": "225",
+       "azChecks": 1,
+       "backChecks": 1
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "27",
+         "s": "0"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "315",
+       "back": "135",
+       "azChecks": 1,
+       "backChecks": 1
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "28",
+         "s": "48"
+        },
+        "lng": {
+         "d": "110",
+         "m": "26",
+         "s": "24"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "3",
+       "back": "183",
+       "azChecks": 1,
+       "backChecks": 1
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "position A",
+       "point": [
+        110.43,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 45,
+        "error": null
+       },
+       "back": {
+        "value": 225,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      },
+      {
+       "label": "position B",
+       "point": [
+        110.45,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 315,
+        "error": null
+       },
+       "back": {
+        "value": 135,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      },
+      {
+       "label": "position C",
+       "point": [
+        110.44,
+        -7.48
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 3,
+        "error": null
+       },
+       "back": {
+        "value": 183,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      }
+     ],
+     "pointsReady": true,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": -1.2,
+      "error": null
+     },
+     "lines": [
+      {
+       "index": 0,
+       "from": [
+        110.43,
+        -7.46
+       ],
+       "bearing": 43.80000000000001
+      },
+      {
+       "index": 1,
+       "from": [
+        110.45,
+        -7.46
+       ],
+       "bearing": 313.79999999999995
+      },
+      {
+       "index": 2,
+       "from": [
+        110.44,
+        -7.48
+       ],
+       "bearing": 1.8000000000000114
+      }
+     ],
+     "fix": {
+      "point": [
+       110.44026179500622,
+       -7.450048817115334
+      ],
+      "along": [
+       1578.3501233226725,
+       1537.5890388915072,
+       3311.6628010210957
+      ],
+      "misses": [
+       55.85508656383149,
+       50.29214583667965,
+       75.16043259528878
+      ],
+      "cutAngle": 90
+     },
+     "problem": null,
+     "review": [
+      {
+       "verdict": "off",
+       "message": "The lines cross 302 m apart (the triangle of error). One reading is off: take them again, starting with the one you are least sure of."
+      }
+     ]
+    }
+   },
+   {
+    "input": {
+     "mode": "intersection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "0",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "225",
+       "back": "45",
+       "azChecks": 1,
+       "backChecks": 1
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "27",
+         "s": "0"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "135",
+       "back": "315",
+       "azChecks": 1,
+       "backChecks": 1
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "position A",
+       "point": [
+        110.43,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 225,
+        "error": null
+       },
+       "back": {
+        "value": 45,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      },
+      {
+       "label": "position B",
+       "point": [
+        110.45,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 135,
+        "error": null
+       },
+       "back": {
+        "value": 315,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      }
+     ],
+     "pointsReady": true,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": 0,
+      "error": null
+     },
+     "lines": [
+      {
+       "index": 0,
+       "from": [
+        110.43,
+        -7.46
+       ],
+       "bearing": 225
+      },
+      {
+       "index": 1,
+       "from": [
+        110.45,
+        -7.46
+       ],
+       "bearing": 135
+      }
+     ],
+     "fix": null,
+     "problem": "The lines only meet behind position A: its azimuth points away from the object. Check the sighting from position A.",
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "intersection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "0",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "90",
+       "back": "270",
+       "azChecks": 1,
+       "backChecks": 1
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "28",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "90",
+       "back": "270",
+       "azChecks": 1,
+       "backChecks": 1
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "position A",
+       "point": [
+        110.43,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 90,
+        "error": null
+       },
+       "back": {
+        "value": 270,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      },
+      {
+       "label": "position B",
+       "point": [
+        110.43,
+        -7.476666666666667
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 90,
+        "error": null
+       },
+       "back": {
+        "value": 270,
+        "error": null
+       },
+       "backCheck": {
+        "verdict": "ok",
+        "message": "Correct."
+       },
+       "backAnswer": null,
+       "azOpen": true,
+       "backOpen": true,
+       "complete": true,
+       "open": true
+      }
+     ],
+     "pointsReady": true,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": 0,
+      "error": null
+     },
+     "lines": [
+      {
+       "index": 0,
+       "from": [
+        110.43,
+        -7.46
+       ],
+       "bearing": 90
+      },
+      {
+       "index": 1,
+       "from": [
+        110.43,
+        -7.476666666666667
+       ],
+       "bearing": 90
+      }
+     ],
+     "fix": null,
+     "problem": "The lines are parallel, so they never cross. Sight objects in clearly different directions.",
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "intersection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "45",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "45",
+       "back": "",
+       "azChecks": 1,
+       "backChecks": 0
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": "36.5"
+        },
+        "lng": {
+         "d": "110",
+         "m": "25",
+         "s": "48"
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "",
+       "back": "",
+       "azChecks": 0,
+       "backChecks": 0
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "position A",
+       "point": [
+        110.43,
+        -7.46
+       ],
+       "pointError": null,
+       "azimuth": {
+        "value": 45,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": true
+      },
+      {
+       "label": "position B",
+       "point": null,
+       "pointError": "This is within 50 m of position A. Choose a point you would sight from a distance.",
+       "azimuth": {
+        "value": null,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": false
+      }
+     ],
+     "pointsReady": false,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": null,
+      "error": "Declination is a small angle in degrees, e.g. 0.8 (east) or -1.2 (west)."
+     },
+     "lines": [],
+     "fix": null,
+     "problem": null,
+     "review": []
+    }
+   },
+   {
+    "input": {
+     "mode": "intersection",
+     "origin": {
+      "lat": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "lng": {
+       "d": "",
+       "m": "",
+       "s": ""
+      },
+      "south": true,
+      "west": false
+     },
+     "declination": "0",
+     "sightings": [
+      {
+       "point": {
+        "lat": {
+         "d": "7",
+         "m": "27",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "",
+       "back": "",
+       "azChecks": 0,
+       "backChecks": 0
+      },
+      {
+       "point": {
+        "lat": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "lng": {
+         "d": "",
+         "m": "",
+         "s": ""
+        },
+        "south": true,
+        "west": false
+       },
+       "azimuth": "",
+       "back": "",
+       "azChecks": 0,
+       "backChecks": 0
+      }
+     ]
+    },
+    "out": {
+     "sightings": [
+      {
+       "label": "position A",
+       "point": null,
+       "pointError": "Enter both the latitude and the longitude.",
+       "azimuth": {
+        "value": null,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": true
+      },
+      {
+       "label": "position B",
+       "point": null,
+       "pointError": null,
+       "azimuth": {
+        "value": null,
+        "error": null
+       },
+       "back": {
+        "value": null,
+        "error": null
+       },
+       "backCheck": null,
+       "backAnswer": null,
+       "azOpen": false,
+       "backOpen": false,
+       "complete": false,
+       "open": false
+      }
+     ],
+     "pointsReady": false,
+     "origin": null,
+     "originError": null,
+     "declination": {
+      "value": 0,
+      "error": null
+     },
+     "lines": [],
+     "fix": null,
+     "problem": null,
+     "review": []
+    }
+   }
+  ]
+ }
 }

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/marked/marked_area_repository.dart';
+import '../../domain/marked/area_contours.dart' show AreaContourMeta;
 import '../../domain/marked/marked_areas.dart';
 import '../../domain/share/share_location.dart';
 import '../marked/marked_sheet.dart' show ShareLinkBox;
@@ -154,6 +155,8 @@ class _AreaTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rec = ref.read(areasProvider.notifier);
     final canShare = rec.policy.canShare;
+    final contours = ref.watch(areasProvider.select((s) => s.contourMeta[area.id]));
+    final contoursShown = ref.watch(areasProvider.select((s) => s.shownContours.containsKey(area.id)));
     return Container(
       key: Key('area-${area.id}'),
       margin: const EdgeInsets.only(bottom: 6),
@@ -163,90 +166,158 @@ class _AreaTile extends ConsumerWidget {
         borderRadius: BorderRadius.circular(L360.radiusSmall),
         border: Border.all(color: selected || focused ? L360Colors.gold400 : L360Colors.sand200),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: _hex(area.color),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: L360Colors.sand300),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      area.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '${formatArea(area.areaM2)} · perimeter ${formatLength(area.perimeterM)}',
+                      style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: Key('area-focus-${area.id}'),
+                tooltip: focused ? 'Exit focus' : 'Focus',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(focused ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                onPressed: () => rec.focus(focused ? null : area.id),
+              ),
+              PopupMenuButton<String>(
+                key: Key('area-more-${area.id}'),
+                tooltip: 'More',
+                icon: const Icon(Icons.more_horiz, size: 20),
+                onSelected: (v) async {
+                  switch (v) {
+                    case 'edit':
+                      rec.edit(area);
+                    case 'share':
+                      await showAreaLinkSheet(context, area);
+                    case 'delete':
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog.adaptive(
+                          title: Text('Delete "${area.name}"?'),
+                          content: const Text('It is deleted permanently. A share link stops working.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: TextButton.styleFrom(foregroundColor: L360Colors.brick500),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (ok != true) return;
+                      try {
+                        await rec.delete(area.id);
+                      } on Object catch (e) {
+                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                      }
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  if (canShare) const PopupMenuItem(value: 'share', child: Text('Share as a link')),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete', style: TextStyle(color: L360Colors.brick500)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (contours != null) _ContourRow(meta: contours, shown: contoursShown, areaId: area.id),
+        ],
+      ),
+    );
+  }
+}
+
+/// Contours uploaded to the area on the website: what they are, and show / hide on the map
+class _ContourRow extends ConsumerWidget {
+  const _ContourRow({required this.meta, required this.shown, required this.areaId});
+
+  final AreaContourMeta meta;
+  final bool shown;
+  final String areaId;
+
+  String _m(double v) => '${v.round()} m';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rec = ref.read(areasProvider.notifier);
+    final details = [
+      '${meta.lineCount} lines',
+      if (meta.minElevation != null && meta.maxElevation != null) '${_m(meta.minElevation!)}–${_m(meta.maxElevation!)}',
+      if (meta.intervalM != null) 'every ${formatInterval(meta.intervalM!)} m',
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, top: 2),
       child: Row(
         children: [
-          Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: _hex(area.color),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: L360Colors.sand300),
-            ),
-          ),
-          const SizedBox(width: 10),
+          const Icon(Icons.terrain_outlined, size: 16, color: Color(0xFF8A5A2B)),
+          const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  area.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  '${formatArea(area.areaM2)} · perimeter ${formatLength(area.perimeterM)}',
-                  style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
-                ),
-              ],
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(
+                    text: 'Contours ',
+                    style: TextStyle(fontWeight: FontWeight.w700, color: L360Colors.ink),
+                  ),
+                  TextSpan(text: details),
+                ],
+              ),
+              maxLines: 2,
+              style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
             ),
           ),
           IconButton(
-            key: Key('area-focus-${area.id}'),
-            tooltip: focused ? 'Exit focus' : 'Focus',
+            key: Key('area-contours-$areaId'),
+            tooltip: shown ? 'Hide contours on map' : 'Show contours on map',
             visualDensity: VisualDensity.compact,
-            icon: Icon(focused ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
-            onPressed: () => rec.focus(focused ? null : area.id),
-          ),
-          PopupMenuButton<String>(
-            key: Key('area-more-${area.id}'),
-            tooltip: 'More',
-            icon: const Icon(Icons.more_horiz, size: 20),
-            onSelected: (v) async {
-              switch (v) {
-                case 'edit':
-                  rec.edit(area);
-                case 'share':
-                  await showAreaLinkSheet(context, area);
-                case 'delete':
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog.adaptive(
-                      title: Text('Delete "${area.name}"?'),
-                      content: const Text('It is deleted permanently. A share link stops working.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: TextButton.styleFrom(foregroundColor: L360Colors.brick500),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (ok != true) return;
-                  try {
-                    await rec.delete(area.id);
-                  } on Object catch (e) {
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-                  }
+            icon: Icon(shown ? Icons.layers : Icons.layers_outlined, size: 20, color: const Color(0xFF8A5A2B)),
+            onPressed: () async {
+              if (shown) return rec.hideContours(areaId);
+              try {
+                await rec.showContours(areaId);
+              } on Object catch (e) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
               }
             },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'edit', child: Text('Edit')),
-              if (canShare) const PopupMenuItem(value: 'share', child: Text('Share as a link')),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete', style: TextStyle(color: L360Colors.brick500)),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 }
+
+/// 12.5 stays 12.5, 25.0 shows as 25
+String formatInterval(double v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
 
 class _AreaFormView extends ConsumerStatefulWidget {
   const _AreaFormView({required this.form});

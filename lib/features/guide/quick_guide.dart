@@ -85,6 +85,13 @@ const _entries = <(IconData, String, String)>[
         'message, location and battery to the admin.',
   ),
   (
+    Icons.architecture,
+    'Classic: Resection & Intersection',
+    'Tools > Classic: practise map-and-compass navigation. Type positions in degrees, minutes and seconds and '
+        'bearings in compass degrees; each line is drawn on the map, and in an intersection X marks where the object '
+        'most likely is. Keep several Field Works and share one as a link.',
+  ),
+  (
     Icons.navigation_outlined,
     'GPS Tracking [Pro & Enterprise]',
     'Tools > GPS shares your live position with your team\'s monitors, also with the screen off. Monitor accounts '

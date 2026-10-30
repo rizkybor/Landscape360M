@@ -154,20 +154,31 @@ void main() {
 
     testWidgets('tool tiles are equal squares in two full rows', (tester) async {
       await pump(tester);
-      final names = ['Navigator', 'Route', 'POIs', 'Track', 'Marked', 'Areas', 'Basemaps', 'GPS'];
+      final names = ['Navigator', 'Route', 'Track', 'Marked', 'Areas', 'Basemaps', 'Classic', 'GPS'];
       final rects = [for (final n in names) tester.getRect(find.byKey(Key('tool-$n')))];
       for (final r in rects) {
         expect(r.width, rects.first.width);
         expect(r.height, r.width);
       }
-      // Even gaps in the first row
+      // Even gaps in the first row, the second row right under it, edge to edge
       for (var i = 1; i < 4; i++) {
         expect(rects[i].left - rects[i - 1].right, closeTo(10, 0.01));
       }
-      // Second row right under the first, edge to edge
       expect(rects[4].left, closeTo(rects[0].left, 0.01));
       expect(rects[7].right, closeTo(rects[3].right, 0.01));
       expect(rects[4].top - rects[0].bottom, closeTo(10, 0.01));
+      expect(find.byKey(const Key('tool-POIs')), findsNothing, reason: 'a layer switch in the Map tab');
+    });
+
+    testWidgets('Map tab: points of interest switch on and off, remembered', (tester) async {
+      await pump(tester);
+      await tester.tap(find.byKey(const Key('section-map')));
+      await tester.pumpAndSettle();
+      final before = container.read(mapSettingsProvider).showPois;
+      await tester.ensureVisible(find.byKey(const Key('pois-toggle')));
+      await tester.tap(find.byKey(const Key('pois-toggle')));
+      await tester.pumpAndSettle();
+      expect(container.read(mapSettingsProvider).showPois, !before);
     });
 
     testWidgets('header offers guide, weather, search and signing in; every tool is there', (tester) async {
@@ -179,7 +190,7 @@ void main() {
       expect(find.byType(BrandName), findsOneWidget);
       expect(find.byTooltip('Sign in'), findsOneWidget);
       // Same tools as the web's phone layout
-      for (final name in ['Navigator', 'Route', 'Track', 'POIs', 'Marked', 'Areas', 'Basemaps', 'GPS']) {
+      for (final name in ['Navigator', 'Route', 'Track', 'Marked', 'Areas', 'Basemaps', 'Classic', 'GPS']) {
         expect(
           tester.widget<ToolTile>(find.ancestor(of: find.text(name), matching: find.byType(ToolTile))).enabled,
           isTrue,
@@ -193,7 +204,8 @@ void main() {
       for (final name in ['Track', 'Marked', 'Areas', 'Basemaps', 'GPS']) {
         expect(opacityOf(name), 0.5, reason: name);
       }
-      for (final name in ['Navigator', 'Route', 'POIs']) {
+      // Classic needs no account, like the web
+      for (final name in ['Navigator', 'Route', 'Classic']) {
         expect(opacityOf(name), 1, reason: name);
       }
       for (final (name, title) in [

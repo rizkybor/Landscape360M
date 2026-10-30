@@ -79,7 +79,10 @@ void main() {
       });
       expect((p.category, p.elevationM), (MarkedLocationCategory.shelter, null));
       expect(p.tags, ['shelter', 'water']);
-      expect(LinkedPlace.fromRow({'name': 'x', 'category': 'nope', 'lat': 0, 'lng': 0}).category, MarkedLocationCategory.poi);
+      expect(
+        LinkedPlace.fromRow({'name': 'x', 'category': 'nope', 'lat': 0, 'lng': 0}).category,
+        MarkedLocationCategory.poi,
+      );
     });
 
     testWidgets('the card shows the place and closes', (tester) async {
@@ -87,7 +90,10 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: c,
-          child: MaterialApp(theme: buildAppTheme(), home: const Scaffold(body: SharedLinkCard())),
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: const Scaffold(body: SharedLinkCard()),
+          ),
         ),
       );
       await c.read(sharedLinkProvider.notifier).open(const PointLink((lat: -6.7471, lng: 106.9932)));
@@ -106,7 +112,8 @@ void main() {
         ProviderScope(
           overrides: [
             phoneFixProvider.overrideWithValue(
-              () async => const LocationFix(lat: -6.7471, lng: 106.9932, elevation: 2930, accuracy: 8, time: 1700000000000),
+              () async =>
+                  const LocationFix(lat: -6.7471, lng: 106.9932, elevation: 2930, accuracy: 8, time: 1700000000000),
             ),
             authUserIdProvider.overrideWith((ref) => Stream.value('u1')),
             profileProvider.overrideWith(
@@ -160,7 +167,14 @@ void main() {
 
   group('points of interest', () {
     const pois = [
-      PointOfInterest(id: 'a', name: 'Gunung Gede', category: 'mountain', lng: 106.98, lat: -6.78, subtitle: '2.958 mdpl'),
+      PointOfInterest(
+        id: 'a',
+        name: 'Gunung Gede',
+        category: 'mountain',
+        lng: 106.98,
+        lat: -6.78,
+        subtitle: '2.958 mdpl',
+      ),
       PointOfInterest(id: 'b', name: 'Mata air', category: 'water', lng: 106.97, lat: -6.77),
     ];
 
@@ -181,7 +195,10 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: c,
-          child: MaterialApp(theme: buildAppTheme(), home: const Scaffold(body: PoiCard())),
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: const Scaffold(body: PoiCard()),
+          ),
         ),
       );
       c.read(selectedPoiProvider.notifier).select(pois.first);

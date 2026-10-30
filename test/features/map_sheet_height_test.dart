@@ -128,16 +128,17 @@ void main() {
     }
 
     double top() => tester.getTopLeft(find.byKey(const Key('section-tools'))).dy;
-    // Every section ends at its own height, the same way whatever the order: Tools and Map
-    // fit their content (no white space), Terrain stops at 90% of the screen and scrolls
+    // Every section ends at its own height, the same way whatever the order: Tools fits its
+    // content (no white space); Terrain, and on this phone Map, stop at 90% of the screen and
+    // scroll
     const terrainTop = screen * 0.1;
     Future<void> fitsThrough(List<String> sections) async {
       for (final s in sections) {
         await tab(s);
-        if (s == 'terrain') {
-          expect(top(), closeTo(terrainTop + 140, 30), reason: 'Terrain at 90%');
+        if (s == 'tools') {
+          expect(gap(), inInclusiveRange(0, 80), reason: 'Tools fits its content');
         } else {
-          expect(gap(), inInclusiveRange(0, 80), reason: '$s fits its content');
+          expect(top(), closeTo(terrainTop + 140, 30), reason: '$s at 90%');
         }
       }
     }

@@ -19,6 +19,7 @@ import '../account/sign_in_sheet.dart';
 import '../areas/area_state.dart';
 import '../basemaps/basemap_sheet.dart';
 import '../basemaps/basemap_state.dart';
+import '../classic/classic_state.dart';
 import '../guide/quick_guide.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
@@ -438,11 +439,11 @@ class _ToolsSection extends ConsumerWidget {
   static const List<(IconData, String, int?)> tools = [
     (Icons.straighten, 'Navigator', null),
     (Icons.alt_route, 'Route', null),
-    (Icons.place_outlined, 'POIs', null),
     (Icons.directions_walk, 'Track', null),
     (Icons.pin_drop_outlined, 'Marked', null),
     (Icons.hexagon_outlined, 'Areas', null),
     (Icons.layers_outlined, 'Basemaps', null),
+    (Icons.architecture, 'Classic', null),
     (Icons.navigation_outlined, 'GPS', null),
   ];
 
@@ -456,6 +457,7 @@ class _ToolsSection extends ConsumerWidget {
       ref.read(navigatorProvider.notifier).close();
       ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
       ref.read(areasProvider.notifier).setPanelOpen(false);
+      ref.read(classicProvider.notifier).setPanelOpen(false);
       planner.enable();
     }
   }
@@ -468,6 +470,7 @@ class _ToolsSection extends ConsumerWidget {
       ref.read(routePlannerProvider.notifier).disable();
       ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
       ref.read(areasProvider.notifier).setPanelOpen(false);
+      ref.read(classicProvider.notifier).setPanelOpen(false);
       nav.open();
     }
   }
@@ -491,6 +494,7 @@ class _ToolsSection extends ConsumerWidget {
       ref.read(routePlannerProvider.notifier).disable();
       ref.read(navigatorProvider.notifier).close();
       ref.read(areasProvider.notifier).setPanelOpen(false);
+      ref.read(classicProvider.notifier).setPanelOpen(false);
       rec.setPanelOpen(true);
     }
   }
@@ -524,6 +528,20 @@ class _ToolsSection extends ConsumerWidget {
     unawaited(showBasemapSheet(context));
   }
 
+  // Every account, signed in or not (resection / intersection practice); one panel at a time
+  static void _toggleClassic(WidgetRef ref) {
+    final classic = ref.read(classicProvider.notifier);
+    if (ref.read(classicProvider).panelOpen) {
+      classic.setPanelOpen(false);
+    } else {
+      ref.read(routePlannerProvider.notifier).disable();
+      ref.read(navigatorProvider.notifier).close();
+      ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      ref.read(areasProvider.notifier).setPanelOpen(false);
+      classic.setPanelOpen(true);
+    }
+  }
+
   static void _openGps(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
       unawaited(
@@ -550,6 +568,7 @@ class _ToolsSection extends ConsumerWidget {
       ref.read(routePlannerProvider.notifier).disable();
       ref.read(navigatorProvider.notifier).close();
       ref.read(trackRecorderProvider.notifier).setPanelOpen(false);
+      ref.read(classicProvider.notifier).setPanelOpen(false);
       areas.setPanelOpen(true);
     }
   }
@@ -587,11 +606,11 @@ class _ToolsSection extends ConsumerWidget {
                     'Route' => ref.watch(routePlannerProvider.select((s) => s.enabled)),
                     'Navigator' => ref.watch(navigatorProvider.select((s) => s.enabled)),
                     'Track' => ref.watch(trackRecorderProvider.select((s) => s.panelOpen || s.active != null)),
-                    'POIs' => ref.watch(mapSettingsProvider.select((s) => s.showPois)),
                     'Marked' => ref.watch(markedProvider.select((s) => s.picking)),
                     'Basemaps' => ref.watch(basemapsProvider.select((s) => s.basemaps.any((b) => b.active))),
                     'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
                     'GPS' => ref.watch(liveTrackingProvider.select((s) => s.on)),
+                    'Classic' => ref.watch(classicProvider.select((s) => s.panelOpen)),
                     _ => false,
                   },
                   onTap: switch (label) {
@@ -602,9 +621,7 @@ class _ToolsSection extends ConsumerWidget {
                     'Areas' => () => _toggleAreas(context, ref),
                     'Basemaps' => () => _openBasemaps(context, ref),
                     'GPS' => () => _openGps(context, ref),
-                    // A map layer that stays on (remembered); switching it on lowers the sheet
-                    'POIs' =>
-                      () => ref.read(mapSettingsProvider.notifier).setShowPois(!ref.read(mapSettingsProvider).showPois),
+                    'Classic' => () => _toggleClassic(ref),
                     _ => null,
                   },
                 ),
@@ -776,7 +793,9 @@ class _MapSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 20),
-        const SectionLabel('Offline'),
+        // Points of interest (a map layer that stays on, remembered; switching it on lowers the
+        // sheet to show it) and offline maps, in one card
+        const SectionLabel('On the map'),
         Material(
           color: L360Colors.sand50,
           shape: RoundedRectangleBorder(
@@ -784,31 +803,48 @@ class _MapSection extends ConsumerWidget {
             side: const BorderSide(color: L360Colors.sand200),
           ),
           clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            key: const Key('offline-maps'),
-            leading: const Icon(Icons.download_for_offline_outlined, color: L360Colors.forest700),
-            title: const Text('Offline maps', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Consumer(
-              builder: (context, ref, _) {
-                final o = ref.watch(offlineProvider);
-                final running = o.progress.length;
-                return Text(
-                  running > 0
-                      ? 'Downloading $running area${running == 1 ? '' : 's'}…'
-                      : 'Use the map without signal: ${o.stored.length} area${o.stored.length == 1 ? '' : 's'} on this phone',
-                );
-              },
-            ),
-            trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
-            onTap: () {
-              if (ref.read(authUserIdProvider).value == null) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(content: Text('Sign in to download offline maps.')));
-                return;
-              }
-              unawaited(showOfflineSheet(context));
-            },
+          child: Column(
+            children: [
+              SwitchListTile.adaptive(
+                key: const Key('pois-toggle'),
+                secondary: const Icon(Icons.place_outlined, color: L360Colors.forest700),
+                title: const Text('Points of interest', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Trail posts, camps, water and summits'),
+                value: ref.watch(mapSettingsProvider.select((s) => s.showPois)),
+                onChanged: (v) => ref.read(mapSettingsProvider.notifier).setShowPois(v),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                key: const Key('offline-maps'),
+                leading: const Icon(Icons.download_for_offline_outlined, color: L360Colors.forest700),
+                title: const Text('Offline maps', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Consumer(
+                  builder: (context, ref, _) {
+                    final o = ref.watch(offlineProvider);
+                    final running = o.progress.length;
+                    return Text(
+                      running > 0
+                          ? 'Downloading $running area${running == 1 ? '' : 's'}…'
+                          : 'Use the map without signal: ${o.stored.length} area${o.stored.length == 1 ? '' : 's'} on this phone',
+                    );
+                  },
+                ),
+                trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+                onTap: () {
+                  if (ref.read(authUserIdProvider).value == null) {
+                    unawaited(
+                      showSignInSheet(
+                        context,
+                        title: 'Offline maps',
+                        reason: 'Sign in to download areas and use the map without signal.',
+                      ),
+                    );
+                    return;
+                  }
+                  unawaited(showOfflineSheet(context));
+                },
+              ),
+            ],
           ),
         ),
       ],
