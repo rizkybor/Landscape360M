@@ -168,6 +168,9 @@ void main() {
   testWidgets('About: version, legal pages and support', (tester) async {
     await pump(tester, start: '/about');
     expect(find.text('Version 3.3.0'), findsOneWidget, reason: 'the website\'s number, no build or flavour');
+    expect(find.byKey(const Key('about-stores')), findsOneWidget);
+    expect(find.text('Google Play'), findsOneWidget);
+    expect(find.text('App Store'), findsOneWidget);
     for (final k in ['about-privacy', 'about-terms', 'about-delete', 'about-reviews', 'about-support']) {
       expect(find.byKey(Key(k)), findsOneWidget, reason: k);
     }
