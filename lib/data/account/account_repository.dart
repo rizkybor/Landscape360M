@@ -177,6 +177,23 @@ class AccountRepository {
     await backend.rpc('update_my_contact', {'p_organization': organization.trim(), 'p_phone': phone.trim()});
   }
 
+  /// Checks the signed-in account's password (by signing in with it again), before it is
+  /// saved for Face ID
+  Future<void> checkPassword(String password) async {
+    final email = backend.currentUser?.email;
+    if (email == null) throw const AccountException('Not signed in');
+    if (password.isEmpty) throw const AccountException('Enter your password');
+    try {
+      await backend.signIn(email, password);
+    } on AuthException catch (err) {
+      throw AccountException(
+        RegExp('invalid login credentials', caseSensitive: false).hasMatch(err.message)
+            ? 'Your password is not correct'
+            : err.message,
+      );
+    }
+  }
+
   /// Changes the password after checking the current one (by signing in with it), so
   /// someone holding an unlocked phone cannot change it. Other devices are signed out.
   Future<void> changePassword({required String current, required String next, required String confirm}) async {

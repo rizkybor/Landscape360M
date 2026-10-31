@@ -13,6 +13,8 @@ import '../offline/offline_state.dart' show offlineSheetRequestProvider;
 import '../sos/sos_alerts.dart';
 import '../sos/sos_screen.dart';
 import '../sos/sos_state.dart';
+import 'biometric_state.dart';
+import 'biometric_ui.dart';
 import 'delete_account.dart';
 
 /// User Account: profile, plan / role badges, cloud storage, edit, password, sign out.
@@ -143,6 +145,7 @@ class _AccountBody extends ConsumerWidget {
                         ref.read(offlineSheetRequestProvider.notifier).open();
                       },
                     ),
+                    BiometricTile(email: p.email),
                     ListTile(
                       leading: const TileIcon(Icons.lock_outline),
                       title: const Text('Change password'),
@@ -681,6 +684,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       await ref
           .read(accountRepositoryProvider)
           .changePassword(current: _current.text, next: _next.text, confirm: _confirm.text);
+      // Face ID keeps working with the new password
+      final email = ref.read(profileProvider).value?.email;
+      if (email != null) await ref.read(biometricProvider.notifier).passwordChanged(email, _next.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Password changed. Other devices were signed out.')));

@@ -9,6 +9,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import 'account_screen.dart';
+import 'biometric_state.dart';
+import 'biometric_ui.dart';
 
 const _supportEmail = 'contact@jcdigital.co.id';
 
@@ -41,6 +43,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await ref.read(accountRepositoryProvider).signIn(_email.text, _password.text);
+      await HapticFeedback.mediumImpact();
+      if (!mounted) return;
+      await offerBiometric(context, ref, _email.text, _password.text);
+      if (mounted) context.go('/');
+    } on AccountException catch (e) {
+      await HapticFeedback.heavyImpact();
+      setState(() => _error = e.message);
+    } on Object {
+      setState(() => _error = 'Could not sign in. Check your connection and try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _biometric() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      if (!await ref.read(biometricProvider.notifier).signIn()) return;
       await HapticFeedback.mediumImpact();
       if (mounted) context.go('/');
     } on AccountException catch (e) {
@@ -154,6 +177,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         key: const Key('login-submit'),
                         child: BusyButton(label: 'Sign in', busy: _busy, onPressed: _submit),
                       ),
+                      BiometricSignInButton(busy: _busy, onPressed: _biometric),
                       const SizedBox(height: 32),
                       // New here
                       const _OrDivider("Don't have an account?"),

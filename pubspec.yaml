@@ -57,6 +57,7 @@ dependencies:
   pdf: ^3.13.1
   image: ^4.12.0
   package_info_plus: ^10.2.2
+  local_auth: ^3.0.2
 
 dev_dependencies:
   integration_test:

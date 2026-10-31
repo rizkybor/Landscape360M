@@ -108,7 +108,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Future<void> _remindPlanEnd(AccountProfile? profile) async {
     final text = await planReminderDue(ref.read(planReminderPrefsProvider), profile, DateTime.now());
     if (text == null || !mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 6)));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 6)));
   }
 
   @override
