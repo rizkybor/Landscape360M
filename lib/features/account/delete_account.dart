@@ -14,6 +14,7 @@ import '../live/live_tracking_state.dart';
 import '../sos/sos_state.dart';
 import '../tracks/track_recorder_state.dart';
 import 'account_screen.dart' show FormFieldRow;
+import 'biometric_state.dart';
 
 // Delete account (App Store 5.1.1(v), Google Play account deletion), in two steps: what is
 // deleted, then the password and DELETE typed. The server deletes the account and its data;
@@ -122,6 +123,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       await read(liveTrackingProvider.notifier).stop();
       await read(accountRepositoryProvider).deleteAccount(password: _password.text);
       await deleteAccountData(read, profile.userId, basemapIds);
+      // The saved Face ID login of the deleted account goes too
+      if (read(biometricProvider).email == profile.email.toLowerCase()) {
+        await read(biometricProvider.notifier).disable();
+      }
       messenger.showSnackBar(const SnackBar(content: Text('Your account has been deleted.')));
       router.go('/');
     } on AccountException catch (e) {

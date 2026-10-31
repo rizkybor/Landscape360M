@@ -62,7 +62,9 @@ class AccountProfile {
       email: email,
       displayName: displayName,
       plan: isAdmin ? Plan.enterprise : (ended ? Plan.free : Plan.parse(row?['status_subscribe'] as String?)),
-      role: isAdmin ? UserRole.monitor360 : (ended ? UserRole.pengguna360 : UserRole.parse(row?['status_user'] as String?)),
+      role: isAdmin
+          ? UserRole.monitor360
+          : (ended ? UserRole.pengguna360 : UserRole.parse(row?['status_user'] as String?)),
       isAdmin: isAdmin,
       // Offline (no row) the last known value stays, so the S.O.S button does not
       // disappear where there is no signal
@@ -125,7 +127,20 @@ class AccountProfile {
         };
 }
 
-const _months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const _months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
 /// "30 November 2026" in the phone's local time
 String formatPlanDate(DateTime when) {
