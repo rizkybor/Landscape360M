@@ -205,6 +205,24 @@ void main() {
       expect(p.phone, isNull);
     });
 
+    test("keeps a paid plan's end date offline, and shows Free once it has passed", () async {
+      final end = DateTime.now().add(const Duration(days: 20)).toUtc().toIso8601String();
+      backend
+        ..user = _user()
+        ..row = {'status_subscribe': 'Pro', 'subscription_expires_at': end};
+      expect((await repo().loadProfile())!.subscriptionExpiresAt, isNotNull);
+      backend.profileError = Exception('No internet');
+      final offline = (await repo().loadProfile())!;
+      expect((offline.plan, offline.subscriptionExpiresAt?.toUtc().toIso8601String()), (Plan.pro, end));
+
+      // Ran out, before the server's daily clean-up turned it to Free
+      backend
+        ..profileError = null
+        ..row = {'status_subscribe': 'Pro', 'subscription_expires_at': DateTime.now().subtract(const Duration(hours: 1)).toUtc().toIso8601String()};
+      final ended = (await repo().loadProfile())!;
+      expect((ended.plan, ended.subscriptionExpiresAt, ended.canRenameCloudTracks), (Plan.free, null, false));
+    });
+
     test('the cached permission belongs to one account only', () async {
       backend
         ..user = _user(id: 'u1')
