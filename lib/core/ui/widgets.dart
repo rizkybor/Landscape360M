@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -27,11 +28,17 @@ class GlassPanel extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final double radius;
 
+  /// The blur runs on iPhone only. On Android the map is a native view under Flutter, and a
+  /// blur over it is redrawn for every panel on every frame while the map moves (and does not
+  /// blur the map anyway): there the panel is a little more solid instead.
+  static bool get blurs => defaultTargetPlatform == TargetPlatform.iOS;
+
   @override
   Widget build(BuildContext context) {
+    final blur = blurs && GlassBlur.of(context);
     final face = DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.82),
+        color: Colors.white.withValues(alpha: blurs ? 0.82 : 0.94),
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 0.8),
       ),
@@ -41,9 +48,7 @@ class GlassPanel extends StatelessWidget {
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: L360.shadow),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius),
-        child: GlassBlur.of(context)
-            ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: face)
-            : face,
+        child: blur ? BackdropFilter.grouped(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: face) : face,
       ),
     );
   }

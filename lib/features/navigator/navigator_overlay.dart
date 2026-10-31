@@ -120,6 +120,12 @@ class _NavigatorOverlayState extends ConsumerState<NavigatorOverlay> {
         add('m:${g.id}:$i', mids[i].$1, mids[i].$2);
       }
     }
+    // No survey points (the usual case): no call to the map and no rebuild per camera move
+    if (coords.isEmpty) {
+      _projecting = false;
+      if (_screen.isNotEmpty) setState(_screen.clear);
+      return;
+    }
     widget.map
         .pixelsForCoordinates(coords)
         .then((pixels) {

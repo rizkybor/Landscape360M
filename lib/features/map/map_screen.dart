@@ -438,7 +438,9 @@ class _LiveMap extends ConsumerStatefulWidget {
 
 class _LiveMapState extends ConsumerState<_LiveMap> {
   MapboxMap? _map;
-  Telemetry _telemetry = Telemetry(lng: defaultCenter.lng, lat: defaultCenter.lat, pitch: 0, bearing: 0);
+  // Changes up to 10 times a second while the map moves: only the card and the compass
+  // needle listen, the rest of the map screen is not rebuilt
+  final _telemetry = ValueNotifier(Telemetry(lng: defaultCenter.lng, lat: defaultCenter.lat, pitch: 0, bearing: 0));
   DateTime _lastTelemetry = DateTime(0);
   bool _locating = false;
   String? _message;
@@ -457,6 +459,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
   final _cameraTick = ValueNotifier<int>(0);
+  final _backdropKey = BackdropKey();
   final _styleTick = ValueNotifier<int>(0);
 
   /// Terrain height without the 3D exaggeration (0 where the terrain has not loaded)
@@ -504,6 +507,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   @override
   void dispose() {
+    _telemetry.dispose();
     _compassSub?.cancel();
     _links.dispose();
     _chromeTimer?.cancel();
@@ -847,14 +851,12 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     if (now.difference(_lastTelemetry).inMilliseconds < 100) return;
     _lastTelemetry = now;
     final c = e.cameraState;
-    setState(() {
-      _telemetry = _telemetry.withCamera(
-        lng: c.center.coordinates.lng.toDouble(),
-        lat: c.center.coordinates.lat.toDouble(),
-        pitch: c.pitch,
-        bearing: c.bearing,
-      );
-    });
+    _telemetry.value = _telemetry.value.withCamera(
+      lng: c.center.coordinates.lng.toDouble(),
+      lat: c.center.coordinates.lat.toDouble(),
+      pitch: c.pitch,
+      bearing: c.bearing,
+    );
   }
 
   Future<void> _updateElevation() async {
@@ -875,16 +877,14 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     if (!mounted) return;
     ref.read(mapCenterProvider.notifier).set(lng, lat);
     ref.read(mapZoomProvider.notifier).set(c.zoom);
-    setState(() {
-      _telemetry = Telemetry(
-        lng: lng,
-        lat: lat,
-        pitch: c.pitch,
-        bearing: c.bearing,
-        elevation: elev,
-        slope: elev == null ? null : terrainSlopeDegrees(elev, east ?? elev, north ?? elev),
-      );
-    });
+    _telemetry.value = Telemetry(
+      lng: lng,
+      lat: lat,
+      pitch: c.pitch,
+      bearing: c.bearing,
+      elevation: elev,
+      slope: elev == null ? null : terrainSlopeDegrees(elev, east ?? elev, north ?? elev),
+    );
   }
 
   Future<bool> _locationAllowed({required bool ask}) async {
@@ -1136,171 +1136,180 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
     final top = MediaQuery.paddingOf(context).top + 8;
     final satellite = settings.style == MapStyle.satellite;
-    return Stack(
-      children: [
-        MapWidget(
-          key: const ValueKey('map'),
-          styleUri: settings.style.uri,
-          onMapCreated: _onMapCreated,
-          onStyleLoadedListener: _onStyleLoaded,
-          onCameraChangeListener: _onCameraChanged,
-        ),
-        // Keeps the status bar readable over satellite imagery
-        if (satellite)
-          IgnorePointer(
-            child: Container(
-              height: top + 40,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x66000000), Color(0x00000000)],
+    // The frosted panels over the map read the map behind them once, together
+    return BackdropGroup(
+      backdropKey: _backdropKey,
+      child: Stack(
+        children: [
+          MapWidget(
+            key: const ValueKey('map'),
+            styleUri: settings.style.uri,
+            onMapCreated: _onMapCreated,
+            onStyleLoadedListener: _onStyleLoaded,
+            onCameraChangeListener: _onCameraChanged,
+          ),
+          // Keeps the status bar readable over satellite imagery
+          if (satellite)
+            IgnorePointer(
+              child: Container(
+                height: top + 40,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x66000000), Color(0x00000000)],
+                  ),
                 ),
               ),
             ),
-          ),
-        // Crosshair: the telemetry describes this point
-        const IgnorePointer(child: Center(child: _Crosshair())),
-        if (_map != null)
-          Positioned.fill(
-            child: NavigatorOverlay(
-              map: _map!,
-              cameraTick: _cameraTick,
-              styleTick: _styleTick,
-              elevationAt: _elevationAt,
-            ),
-          ),
-        if (_map != null)
-          Positioned.fill(
-            child: ClassicOverlay(
-              map: _map!,
-              cameraTick: _cameraTick,
-              styleTick: _styleTick,
-              bottomInset: widget.sheetInset,
-            ),
-          ),
-        Positioned(
-          left: 12,
-          top: top,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _chrome(
-                // Opened for its details, it stays
-                keepAwake: _telemetryOpen,
-                child: TelemetryCard(
-                  key: const Key('telemetry-card'),
-                  telemetry: _telemetry,
-                  format: settings.coordFormat,
-                  onFormatChanged: ref.read(mapSettingsProvider.notifier).setCoordFormat,
-                  expanded: _telemetryOpen,
-                  onToggle: () => setState(() => _telemetryOpen = !_telemetryOpen),
-                ),
+          // Crosshair: the telemetry describes this point
+          const IgnorePointer(child: Center(child: _Crosshair())),
+          if (_map != null)
+            Positioned.fill(
+              child: NavigatorOverlay(
+                map: _map!,
+                cameraTick: _cameraTick,
+                styleTick: _styleTick,
+                elevationAt: _elevationAt,
               ),
-              if (ref.watch(weatherShownProvider)) ...[
-                const SizedBox(height: 10),
-                WeatherCard(mapCenter: () => (lat: _telemetry.lat, lng: _telemetry.lng)),
+            ),
+          if (_map != null)
+            Positioned.fill(
+              child: ClassicOverlay(
+                map: _map!,
+                cameraTick: _cameraTick,
+                styleTick: _styleTick,
+                bottomInset: widget.sheetInset,
+              ),
+            ),
+          Positioned(
+            left: 12,
+            top: top,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _chrome(
+                  // Opened for its details, it stays
+                  keepAwake: _telemetryOpen,
+                  child: ValueListenableBuilder(
+                    valueListenable: _telemetry,
+                    builder: (context, telemetry, _) => TelemetryCard(
+                      key: const Key('telemetry-card'),
+                      telemetry: telemetry,
+                      format: settings.coordFormat,
+                      onFormatChanged: ref.read(mapSettingsProvider.notifier).setCoordFormat,
+                      expanded: _telemetryOpen,
+                      onToggle: () => setState(() => _telemetryOpen = !_telemetryOpen),
+                    ),
+                  ),
+                ),
+                if (ref.watch(weatherShownProvider)) ...[
+                  const SizedBox(height: 10),
+                  WeatherCard(mapCenter: () => (lat: _telemetry.value.lat, lng: _telemetry.value.lng)),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        Positioned(
-          right: 12,
-          top: top,
-          child: Column(
-            children: [
-              _chrome(
-                child: Column(
-                  key: const Key('map-buttons'),
-                  children: [
-                    MapIconButton(
-                      key: const Key('reset-north'),
-                      tooltip: 'Reset to north',
-                      onPressed: _resetNorth,
-                      child: Transform.rotate(
-                        angle: -_telemetry.bearing * math.pi / 180,
-                        child: const CustomPaint(size: Size(18, 24), painter: _NeedlePainter()),
+          Positioned(
+            right: 12,
+            top: top,
+            child: Column(
+              children: [
+                _chrome(
+                  child: Column(
+                    key: const Key('map-buttons'),
+                    children: [
+                      MapIconButton(
+                        key: const Key('reset-north'),
+                        tooltip: 'Reset to north',
+                        onPressed: _resetNorth,
+                        child: ValueListenableBuilder(
+                          valueListenable: _telemetry,
+                          builder: (context, t, needle) =>
+                              Transform.rotate(angle: -t.bearing * math.pi / 180, child: needle),
+                          child: const CustomPaint(size: Size(18, 24), painter: _NeedlePainter()),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    GlassPanel(
-                      radius: L360.touch / 2,
-                      child: Column(
-                        children: [
-                          _ZoomButton(icon: Icons.add, tooltip: 'Zoom in', onPressed: () => _zoomBy(1)),
-                          Container(width: 24, height: 0.8, color: L360Colors.sand300),
-                          _ZoomButton(icon: Icons.remove, tooltip: 'Zoom out', onPressed: () => _zoomBy(-1)),
-                        ],
+                      const SizedBox(height: 10),
+                      GlassPanel(
+                        radius: L360.touch / 2,
+                        child: Column(
+                          children: [
+                            _ZoomButton(icon: Icons.add, tooltip: 'Zoom in', onPressed: () => _zoomBy(1)),
+                            Container(width: 24, height: 0.8, color: L360Colors.sand300),
+                            _ZoomButton(icon: Icons.remove, tooltip: 'Zoom out', onPressed: () => _zoomBy(-1)),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    MapIconButton(
-                      key: const Key('locate-me'),
-                      tooltip: 'Go to my location',
-                      onPressed: _locateMe,
-                      child: _locating
-                          ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.near_me, color: L360Colors.forest700),
-                    ),
-                    const SizedBox(height: 10),
-                    MapIconButton(
-                      key: const Key('share-location'),
-                      tooltip: 'Share Location',
-                      onPressed: () => showShareLocationSheet(context, terrainAt: _terrainAt),
-                      child: const Icon(Icons.share_location, color: L360Colors.forest700),
-                    ),
-                    const SizedBox(height: 10),
-                    MapIconButton(
-                      key: const Key('export-report'),
-                      tooltip: 'Export report',
-                      onPressed: () {
-                        final map = _map;
-                        if (map != null) unawaited(showReportExport(context, ref, map, MediaQuery.sizeOf(context)));
-                      },
-                      child: const Icon(Icons.photo_camera_outlined, color: L360Colors.forest700),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      MapIconButton(
+                        key: const Key('locate-me'),
+                        tooltip: 'Go to my location',
+                        onPressed: _locateMe,
+                        child: _locating
+                            ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.near_me, color: L360Colors.forest700),
+                      ),
+                      const SizedBox(height: 10),
+                      MapIconButton(
+                        key: const Key('share-location'),
+                        tooltip: 'Share Location',
+                        onPressed: () => showShareLocationSheet(context, terrainAt: _terrainAt),
+                        child: const Icon(Icons.share_location, color: L360Colors.forest700),
+                      ),
+                      const SizedBox(height: 10),
+                      MapIconButton(
+                        key: const Key('export-report'),
+                        tooltip: 'Export report',
+                        onPressed: () {
+                          final map = _map;
+                          if (map != null) unawaited(showReportExport(context, ref, map, MediaQuery.sizeOf(context)));
+                        },
+                        child: const Icon(Icons.photo_camera_outlined, color: L360Colors.forest700),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const SosButton(),
-            ],
+                const SizedBox(height: 14),
+                const SosButton(),
+              ],
+            ),
           ),
-        ),
-        if (_showCalibrateHint)
+          if (_showCalibrateHint)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: _sheetInset + 12,
+              child: Center(child: _CalibrateHint(onDismiss: _dismissHint)),
+            ),
           Positioned(
             left: 16,
             right: 16,
-            bottom: _sheetInset + 12,
-            child: Center(child: _CalibrateHint(onDismiss: _dismissHint)),
-          ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: _sheetInset + 36,
-          child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: _message == null ? 0 : 1,
-              duration: const Duration(milliseconds: 200),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: L360Colors.ink.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(L360.radiusSmall),
-                    boxShadow: L360.shadow,
-                  ),
-                  child: Text(
-                    _message ?? '',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+            bottom: _sheetInset + 36,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _message == null ? 0 : 1,
+                duration: const Duration(milliseconds: 200),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: L360Colors.ink.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(L360.radiusSmall),
+                      boxShadow: L360.shadow,
+                    ),
+                    child: Text(
+                      _message ?? '',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
