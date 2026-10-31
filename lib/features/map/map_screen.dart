@@ -14,12 +14,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
+import '../../domain/account/profile.dart';
 import '../../domain/compass/device_heading.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/route/route_planner.dart';
 import '../../domain/survey/survey_model.dart';
 import '../../domain/tracks/track_recorder_geo.dart';
 import '../../domain/util/js_compat.dart';
+import '../account/plan_reminder.dart';
 import '../areas/area_layer.dart';
 import '../areas/area_panel.dart';
 import '../areas/area_state.dart';
@@ -90,16 +92,38 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// down instead of being cut to the new height at once
   double? _heldSize;
 
+  // The plan is read again when the app comes back to the front (a plan bought or renewed
+  // on the web shows at once), at most every 2 minutes
+  late final AppLifecycleListener _lifecycle;
+  DateTime _profileReadAt = DateTime.now();
+
+  void _onResume() {
+    final now = DateTime.now();
+    if (now.difference(_profileReadAt) < const Duration(minutes: 2)) return;
+    _profileReadAt = now;
+    ref.invalidate(profileProvider);
+  }
+
+  /// A paid plan ending within 7 days: a reminder, once a day
+  Future<void> _remindPlanEnd(AccountProfile? profile) async {
+    final text = await planReminderDue(ref.read(planReminderPrefsProvider), profile, DateTime.now());
+    if (text == null || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 6)));
+  }
+
   @override
   void initState() {
     super.initState();
     _sheet.addListener(_onSheetMoved);
     // Asked for before the map was on screen (User Account opened on its own)
     if (ref.read(offlineSheetRequestProvider)) _openRequestedOfflineSheet();
+    _lifecycle = AppLifecycleListener(onResume: _onResume);
+    ref.listenManual(profileProvider, (_, next) => unawaited(_remindPlanEnd(next.value)), fireImmediately: true);
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _openingTimer?.cancel();
     _sheet
       ..removeListener(_onSheetMoved)

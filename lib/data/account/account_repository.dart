@@ -45,12 +45,20 @@ class SupabaseAccountBackend implements AccountBackend {
   @override
   Future<List<dynamic>?> rpcRows(String fn) async => await client.rpc<dynamic>(fn) as List<dynamic>?;
 
+  static const _profileColumns = 'status_subscribe, status_user, is_admin, can_use_sos, organization, phone';
+
   @override
-  Future<Map<String, dynamic>?> profileRow(String userId) => client
-      .from('profiles')
-      .select('status_subscribe, status_user, is_admin, can_use_sos, organization, phone')
-      .eq('id', userId)
-      .maybeSingle();
+  Future<Map<String, dynamic>?> profileRow(String userId) async {
+    Future<Map<String, dynamic>?> read(String columns) =>
+        client.from('profiles').select(columns).eq('id', userId).maybeSingle();
+    try {
+      return await read('$_profileColumns, subscription_expires_at');
+    } on PostgrestException catch (e) {
+      // Before the 20261031000023 migration there is no subscription_expires_at
+      if (e.code == '42703' || e.code == 'PGRST204') return read(_profileColumns);
+      rethrow;
+    }
+  }
 
   @override
   Future<void> updatePassword(String password) => client.auth.updateUser(UserAttributes(password: password));
@@ -94,7 +102,7 @@ class AccountRepository {
 
   // Plan, role and admin flag kept from the last successful load (no personal data), so
   // without signal an Enterprise account still records tracks and is not shown as Free
-  static const _accessFields = ['status_subscribe', 'status_user', 'is_admin'];
+  static const _accessFields = ['status_subscribe', 'status_user', 'is_admin', 'subscription_expires_at'];
 
   /// Signs in, then records the sign-in for the admin's login history (never blocks it)
   Future<void> signIn(String email, String password) async {

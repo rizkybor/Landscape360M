@@ -341,6 +341,31 @@ class _ProfileCard extends StatelessWidget {
                   ),
               ],
             ),
+            // A paid plan: when it ends (red in its last week)
+            if (planEndText(p, DateTime.now()) case final end?) ...[
+              const SizedBox(height: 8),
+              Row(
+                key: const Key('plan-end'),
+                children: [
+                  Icon(
+                    Icons.event_outlined,
+                    size: 15,
+                    color: p.endsSoon(DateTime.now()) ? L360Colors.brick600 : L360Colors.sand500,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${p.plan.value} · $end',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: p.endsSoon(DateTime.now()) ? FontWeight.w700 : FontWeight.w500,
+                        color: p.endsSoon(DateTime.now()) ? L360Colors.brick600 : L360Colors.sand500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 14),
             const Divider(height: 1),
             const SizedBox(height: 6),
