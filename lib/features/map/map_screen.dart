@@ -15,6 +15,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
 import '../../domain/account/profile.dart';
+import '../../domain/community/community.dart';
 import '../../domain/compass/device_heading.dart';
 import '../../domain/map/map_settings.dart';
 import '../../domain/route/route_planner.dart';
@@ -29,6 +30,11 @@ import '../basemaps/basemap_state.dart';
 import '../classic/classic_overlay.dart';
 import '../classic/classic_panel.dart';
 import '../classic/classic_state.dart';
+import '../community/community_club_page.dart' show openJoinClub;
+import '../community/community_compose.dart';
+import '../community/community_layer.dart';
+import '../community/community_post_page.dart';
+import '../community/community_state.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
 import '../marked/marked_layer.dart';
@@ -279,7 +285,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ..listen(mapSettingsProvider.select((s) => s.showPois), lowerSheet)
       ..listen(areasProvider.select((s) => s.panelOpen || s.drawing), lowerSheet)
       ..listen(offlineProvider.select((s) => s.framing), lowerSheet)
-      ..listen(classicProvider.select((s) => s.panelOpen), lowerSheet);
+      ..listen(classicProvider.select((s) => s.panelOpen), lowerSheet)
+      ..listen(communityPickProvider.select((s) => s != null && s.picked == null), lowerSheet);
     final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
@@ -300,6 +307,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // The part of the map that a new offline area covers, above the download bar
     final frame = Rect.fromLTRB(20, top + 64, size.width - 20, math.max(top + 160, size.height - sheetInset - 300));
     final markedOpen = ref.watch(markedProvider.select((s) => s.selectedId != null));
+    final communityPicking = ref.watch(communityPickProvider.select((s) => s != null && s.picked == null));
+    final communityFocus = ref.watch(communityFocusProvider) != null;
+    // The location picked on the map goes back into the post being written
+    ref.listen<CommunityPick?>(communityPickProvider, (_, pick) {
+      final at = pick?.picked;
+      if (pick == null || at == null) return;
+      ref.read(communityPickProvider.notifier).cancel();
+      unawaited(openCompose(context, draft: pick.draft.at(at.$1, at.$2)));
+    });
+    // A post opened from its link (/community/<id>)
+    ref.listen<String?>(communityOpenProvider, (_, id) {
+      if (id == null) return;
+      ref.read(communityOpenProvider.notifier).done();
+      unawaited(openCommunityPost(context, id));
+    });
+    // A club invite link (/?join=<token>)
+    ref.listen<String?>(communityJoinProvider, (_, token) {
+      if (token == null) return;
+      ref.read(communityJoinProvider.notifier).done();
+      unawaited(openJoinClub(context, token));
+    });
+    // Sends trail reports written without signal once it is back
+    ref.listen(communityOutboxProvider, (_, _) {});
     // A position picked on the map goes back into the form that asked for it
     ref.listen<PickedPoint?>(markedProvider.select((s) => s.picked), (_, p) {
       final draft = ref.read(markedDraftProvider);
@@ -371,6 +401,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         if (sharedLink) ...[const SharedLinkCard(), const SizedBox(height: 10)],
                         if (poiOpen) ...[const PoiCard(), const SizedBox(height: 10)],
                         if (picking) ...[const PickingBar(), const SizedBox(height: 10)],
+                        if (communityPicking) ...[const CommunityPickingBar(), const SizedBox(height: 10)],
+                        if (communityFocus && !communityPicking) ...[
+                          const CommunityFocusCard(),
+                          const SizedBox(height: 10),
+                        ],
                         if (areaFocus && !areaPanel && !areaDrawing) ...[
                           const AreaFocusPill(),
                           const SizedBox(height: 10),
@@ -456,6 +491,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   AreaLayer? _areaLayer;
   BasemapLayer? _basemapLayer;
   SharedLinkLayer? _linkLayer;
+  CommunityLayer? _communityLayer;
   late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
   final _cameraTick = ValueNotifier<int>(0);
@@ -589,6 +625,13 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   /// A tap for the open drawing tool; false when none is open
   bool _toolTap(double lng, double lat) {
+    // Community, Pick on map: this tap sets where the post is
+    final pick = ref.read(communityPickProvider);
+    if (pick != null && pick.picked == null) {
+      HapticFeedback.lightImpact();
+      ref.read(communityPickProvider.notifier).set(lng, lat);
+      return true;
+    }
     // Classic, Pick on map: this tap places the position
     if (ref.read(classicProvider).picking != null) {
       HapticFeedback.lightImpact();
@@ -697,6 +740,30 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       }),
       interactionID: 'marked-tap',
     );
+    // A community post opens it; a cluster of posts zooms in
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: communityPointsLayer), (feature, context) {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        HapticFeedback.selectionClick();
+        final id = '${feature.properties['id']}';
+        final known = ref.read(communityLayerProvider).posts.where((p) => p.id == id).firstOrNull;
+        if (mounted) unawaited(openCommunityPost(this.context, id, initial: known));
+      }),
+      interactionID: 'community-tap',
+    );
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: communityClustersLayer), (feature, context) async {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        final zoom = (await map.getCameraState()).zoom;
+        await map.easeTo(
+          CameraOptions(center: context.point, zoom: math.min(zoom + 2, maxZoom)),
+          MapAnimationOptions(duration: 500),
+        );
+      }),
+      interactionID: 'community-cluster-tap',
+    );
     map.addInteraction(
       TapInteraction(FeaturesetDescriptor(layerId: poiClustersLayer), (feature, context) async {
         final c = context.point.coordinates;
@@ -749,6 +816,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       final marked = _markedLayer ??= MarkedLayer(map, scale);
       await marked.install();
       await marked.show(ref.read(markedProvider));
+      final community = _communityLayer ??= CommunityLayer(map, scale);
+      await community.install();
+      await community.show(ref.read(communityLayerProvider), ref.read(communityFocusProvider));
       final link = _linkLayer ??= SharedLinkLayer(map);
       await link.install();
       await link.show(ref.read(sharedLinkProvider));
@@ -810,6 +880,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   void _onSettled() {
     if (!mounted) return;
     unawaited(_updateElevation());
+    unawaited(_updateBounds());
     _layers?.onMapIdle(ref.read(mapSettingsProvider));
   }
 
@@ -857,6 +928,22 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       pitch: c.pitch,
       bearing: c.bearing,
     );
+  }
+
+  /// What the map shows, for "Near the map" and the Community layer
+  Future<void> _updateBounds() async {
+    final map = _map;
+    if (map == null) return;
+    try {
+      final b = await map.coordinateBoundsForCamera((await map.getCameraState()).toCameraOptions());
+      if (!mounted) return;
+      final sw = b.southwest.coordinates, ne = b.northeast.coordinates;
+      final bounds = (sw.lng.toDouble(), sw.lat.toDouble(), ne.lng.toDouble(), ne.lat.toDouble());
+      ref.read(mapBoundsProvider.notifier).set(bounds);
+      unawaited(ref.read(communityLayerProvider.notifier).refresh(bounds));
+    } on Object {
+      // Kept as it was until the map settles again
+    }
   }
 
   Future<void> _updateElevation() async {
@@ -1064,6 +1151,23 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (list != null) unawaited(_poiLayer?.show(list));
     });
     ref.listen<SharedView?>(sharedLinkProvider, (_, next) => unawaited(_linkLayer?.show(next)));
+    ref.listen<CommunityLayerState>(communityLayerProvider, (prev, next) {
+      unawaited(_communityLayer?.show(next, ref.read(communityFocusProvider)));
+      // Switched on: the posts in view
+      final b = ref.read(mapBoundsProvider);
+      if (next.shown && !(prev?.shown ?? false) && b != null) {
+        unawaited(ref.read(communityLayerProvider.notifier).refresh(b));
+      }
+    });
+    ref.listen<MapFocus?>(
+      communityFocusProvider,
+      (_, next) => unawaited(_communityLayer?.show(ref.read(communityLayerProvider), next)),
+    );
+    // The feed's kind, condition and club filter apply to the layer too
+    ref.listen<FeedFilter>(communityFeedProvider.select((s) => s.filter), (_, _) {
+      final b = ref.read(mapBoundsProvider);
+      if (b != null) unawaited(ref.read(communityLayerProvider.notifier).refresh(b));
+    });
     ref.listen<MarkedState>(markedProvider, (_, next) => unawaited(_markedLayer?.show(next)));
     ref.listen<AreasState>(areasProvider, (_, _) => unawaited(_showAreas()));
     ref.listen<BasemapsState>(

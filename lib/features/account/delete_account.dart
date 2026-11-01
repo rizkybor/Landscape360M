@@ -7,9 +7,11 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
+import '../../data/community/community_repository.dart' show feedCacheKey;
 import '../../domain/sos/sos.dart' show emergencyContactsKey;
 import '../../domain/sos/sos_outbox.dart' show sosOutboxKey;
 import '../basemaps/basemap_state.dart';
+import '../community/community_state.dart';
 import '../live/live_tracking_state.dart';
 import '../sos/sos_state.dart';
 import '../tracks/track_recorder_state.dart';
@@ -37,6 +39,12 @@ Future<void> deleteAccountData(ProviderReader read, String userId, List<String> 
   await prefs.remove(emergencyContactsKey(userId));
   await prefs.remove(sosOutboxKey);
   await read(basemapPrefsProvider).remove('l360-basemap-opacity-$userId');
+  // Community: trail reports still waiting to be sent (and their photos), the feed kept offline
+  final outbox = read(communityOutboxStoreProvider);
+  for (final item in await outbox.pending(userId)) {
+    await outbox.discard(item.clientId);
+  }
+  await read(communityPrefsProvider).remove(feedCacheKey);
 }
 
 /// Step 1: what deleting means. Busy features (a recording, S.O.S) must end first.

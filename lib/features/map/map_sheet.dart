@@ -20,6 +20,8 @@ import '../areas/area_state.dart';
 import '../basemaps/basemap_sheet.dart';
 import '../basemaps/basemap_state.dart';
 import '../classic/classic_state.dart';
+import '../community/community_sheet.dart';
+import '../community/community_state.dart';
 import '../guide/quick_guide.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
@@ -445,6 +447,7 @@ class _ToolsSection extends ConsumerWidget {
     (Icons.layers_outlined, 'Basemaps', null),
     (Icons.architecture, 'Classic', null),
     (Icons.navigation_outlined, 'GPS', null),
+    (Icons.forum_outlined, 'Community', null),
   ];
 
   // One panel at a time: opening Route, Navigator or Track closes the others (a recording
@@ -611,6 +614,9 @@ class _ToolsSection extends ConsumerWidget {
                     'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
                     'GPS' => ref.watch(liveTrackingProvider.select((s) => s.on)),
                     'Classic' => ref.watch(classicProvider.select((s) => s.panelOpen)),
+                    'Community' =>
+                      ref.watch(communityLayerProvider.select((s) => s.shown)) ||
+                          ref.watch(communityFocusProvider.select((p) => p != null)),
                     _ => false,
                   },
                   onTap: switch (label) {
@@ -622,6 +628,8 @@ class _ToolsSection extends ConsumerWidget {
                     'Basemaps' => () => _openBasemaps(context, ref),
                     'GPS' => () => _openGps(context, ref),
                     'Classic' => () => _toggleClassic(ref),
+                    // Anyone can read; writing asks to sign in
+                    'Community' => () => unawaited(showCommunitySheet(context)),
                     _ => null,
                   },
                 ),
@@ -812,6 +820,15 @@ class _MapSection extends ConsumerWidget {
                 subtitle: const Text('Trail posts, camps, water and summits'),
                 value: ref.watch(mapSettingsProvider.select((s) => s.showPois)),
                 onChanged: (v) => ref.read(mapSettingsProvider.notifier).setShowPois(v),
+              ),
+              const Divider(height: 1, indent: 56),
+              SwitchListTile.adaptive(
+                key: const Key('community-toggle'),
+                secondary: const Icon(Icons.forum_outlined, color: L360Colors.forest700),
+                title: const Text('Community posts', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Trail reports and stories of the last 30 days'),
+                value: ref.watch(communityLayerProvider.select((s) => s.shown)),
+                onChanged: (v) => ref.read(communityLayerProvider.notifier).setShown(v),
               ),
               const Divider(height: 1, indent: 56),
               ListTile(

@@ -83,6 +83,18 @@ class MapZoom extends Notifier<double> {
 
 final mapZoomProvider = NotifierProvider<MapZoom, double>(MapZoom.new);
 
+/// What the map shows once it settles: (west, south, east, north); null until the map is there
+class MapBounds extends Notifier<(double, double, double, double)?> {
+  @override
+  (double, double, double, double)? build() => null;
+
+  void set((double, double, double, double) b) {
+    if (b != state) state = b;
+  }
+}
+
+final mapBoundsProvider = NotifierProvider<MapBounds, (double, double, double, double)?>(MapBounds.new);
+
 /// Screen point → (lng, lat) on the live map; null until the map is there
 typedef MapProjector = Future<(double, double)?> Function(double x, double y);
 

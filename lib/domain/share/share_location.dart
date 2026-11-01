@@ -111,6 +111,27 @@ String buildClassicShareText({required String name, required String mode, requir
 /// WhatsApp with the message filled in (the user picks the chat)
 String whatsappShareUrl(String text) => 'https://wa.me/?text=${Uri.encodeComponent(text)}';
 
+final _postId = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+
+/// The post id in a `/community/<id>` path (a trailing slash allowed), or null
+String? parseCommunityPath(String path) {
+  final m = RegExp(r'^/community/([^/]+)/?$').firstMatch(path);
+  final id = m?.group(1)?.toLowerCase();
+  return id != null && _postId.hasMatch(id) ? id : null;
+}
+
+/// The club invite token in a "?join=" query (32 hex), or null
+String? parseJoinParam(String search) {
+  final token = queryParam(search, 'join');
+  return token != null && _token.hasMatch(token) ? token : null;
+}
+
+/// The post id in a "?post=" query, or null
+String? parsePostParam(String search) {
+  final id = queryParam(search, 'post')?.toLowerCase();
+  return id != null && _postId.hasMatch(id) ? id : null;
+}
+
 /// What an incoming link (universal link / app link) asks the app to open
 sealed class IncomingLink {
   const IncomingLink();
@@ -119,8 +140,13 @@ sealed class IncomingLink {
   /// Only links to [siteUrl]'s host are accepted.
   static IncomingLink? parse(Uri uri, {String host = 'landscape360.jcdigital.co.id'}) {
     if (uri.scheme != 'https' || uri.host != host) return null;
+    // A Community post: /community/<id> (or /?post=<id>, the web's "open on the map")
+    final post = parseCommunityPath(uri.path) ?? parsePostParam(uri.query);
+    if (post != null) return CommunityLink(post);
     if (uri.path.isNotEmpty && uri.path != '/') return null;
     final search = uri.query;
+    final join = parseJoinParam(search);
+    if (join != null) return JoinLink(join);
     final classic = parseClassicToken(search);
     if (classic != null) return ClassicLink(classic);
     final area = parseAreaToken(search);
@@ -150,5 +176,17 @@ class ClassicLink extends IncomingLink {
 
 class AreaLink extends IncomingLink {
   const AreaLink(this.token);
+  final String token;
+}
+
+/// A Community post (`/community/<id>`), opened in the app; anyone can read it
+class CommunityLink extends IncomingLink {
+  const CommunityLink(this.postId);
+  final String postId;
+}
+
+/// A club invite link (`/?join=<token>`): shows the club and lets a signed-in account join
+class JoinLink extends IncomingLink {
+  const JoinLink(this.token);
   final String token;
 }

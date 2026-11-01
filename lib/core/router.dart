@@ -16,6 +16,9 @@ GoRouter buildRouter({required bool Function() isSignedIn, Listenable? refresh})
     GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     GoRoute(path: '/request-account', builder: (_, _) => const RequestAccountScreen()),
     GoRoute(path: '/about', builder: (_, _) => const AboutScreen()),
+    // A Community post link that reaches the router (Flutter deep linking) shows the map; the
+    // post itself is opened by the share-link listener (IncomingLinks)
+    GoRoute(path: '/community/:id', redirect: (_, _) => '/'),
     GoRoute(
       path: '/account',
       builder: (_, _) => const AccountScreen(),
