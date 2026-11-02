@@ -10,10 +10,12 @@ import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/data/account/account_repository.dart';
 import 'package:landscape360/data/api/api_client.dart';
 import 'package:landscape360/domain/account/profile.dart';
+import 'package:landscape360/domain/community/community.dart';
 import 'package:landscape360/domain/sos/sos.dart' show emergencyContactsKey;
 import 'package:landscape360/domain/tracks/recorded_track.dart';
 import 'package:landscape360/domain/tracks/track_recorder_geo.dart';
 import 'package:landscape360/features/basemaps/basemap_state.dart';
+import 'package:landscape360/features/community/community_state.dart' show myClubsProvider;
 import 'package:landscape360/features/tracks/track_recorder_state.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -82,7 +84,12 @@ void main() {
     sent = [];
   });
 
-  Future<void> pump(WidgetTester tester, {bool admin = false, String start = '/account'}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    bool admin = false,
+    String start = '/account',
+    List<CommunityClub> clubs = const [],
+  }) async {
     var signedIn = true;
     final router = buildRouter(isSignedIn: () => signedIn)..go(start);
     final repo = AccountRepository(
@@ -119,6 +126,7 @@ void main() {
           accountRepositoryProvider.overrideWithValue(repo),
           trackLocalStoreProvider.overrideWithValue(tracks),
           basemapFilesProvider.overrideWithValue(files),
+          myClubsProvider.overrideWith((ref) async => clubs),
         ],
         child: MaterialApp.router(theme: buildAppTheme(), routerConfig: router),
       ),
@@ -163,6 +171,38 @@ void main() {
     await pump(tester, admin: true, start: '/about');
     expect(find.byKey(const Key('about-privacy')), findsOneWidget);
     expect(find.byKey(const Key('about-delete')), findsNothing);
+  });
+
+  testWidgets('User Account lists the clubs with their role; none, no section', (tester) async {
+    await pump(tester);
+    expect(find.byKey(const Key('account-clubs')), findsNothing);
+  });
+
+  testWidgets('User Account: each club with its logo or first letter and the role', (tester) async {
+    await pump(
+      tester,
+      clubs: [
+        CommunityClub(
+          id: 'c1',
+          name: 'Mapala UI',
+          role: ClubRole.owner,
+          memberCount: 24,
+          createdAt: DateTime.utc(2026),
+        ),
+        CommunityClub(
+          id: 'c2',
+          name: 'SAR Depok',
+          role: ClubRole.member,
+          memberCount: 1,
+          createdAt: DateTime.utc(2026),
+        ),
+      ],
+    );
+    expect(find.byKey(const Key('account-clubs')), findsOneWidget);
+    expect(find.text('Mapala UI'), findsOneWidget);
+    expect(find.text('Leader · 24 members'), findsOneWidget);
+    expect(find.text('Member · 1 member'), findsOneWidget);
+    expect(find.byKey(const Key('club-avatar-letter')), findsNWidgets(2), reason: 'no photos: the first letters');
   });
 
   testWidgets('About: version, legal pages and support', (tester) async {
