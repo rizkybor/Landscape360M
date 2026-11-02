@@ -76,7 +76,10 @@ void main() {
     final size = tester.getSize(find.byType(MapWidget));
     Future<int> features() async => (await map.queryRenderedFeatures(
       RenderedQueryGeometry.fromScreenBox(
-        ScreenBox(min: ScreenCoordinate(x: 0, y: 0), max: ScreenCoordinate(x: size.width, y: size.height)),
+        ScreenBox(
+          min: ScreenCoordinate(x: 0, y: 0),
+          max: ScreenCoordinate(x: size.width, y: size.height),
+        ),
       ),
       RenderedQueryOptions(),
     )).length;

@@ -38,8 +38,9 @@ void main() {
       ),
     );
     await wait(tester, 6000);
-    double opacity(Key key) =>
-        tester.widget<AnimatedOpacity>(find.ancestor(of: find.byKey(key), matching: find.byType(AnimatedOpacity)).first).opacity;
+    double opacity(Key key) => tester
+        .widget<AnimatedOpacity>(find.ancestor(of: find.byKey(key), matching: find.byType(AnimatedOpacity)).first)
+        .opacity;
 
     await wait(tester, 3500);
     expect(opacity(const Key('telemetry-card')), 0.3, reason: 'still map: faded');

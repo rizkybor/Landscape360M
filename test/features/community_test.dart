@@ -9,7 +9,7 @@ import 'package:landscape360/core/config/app_config.dart';
 import 'package:landscape360/core/providers.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/data/community/community_outbox.dart';
-import 'package:landscape360/data/community/community_repository.dart' show feedCacheKey;
+import 'package:landscape360/data/community/community_repository.dart' show CommunityException, feedCacheKey;
 import 'package:landscape360/data/community/photo_compress.dart';
 import 'package:landscape360/domain/account/profile.dart';
 import 'package:landscape360/domain/community/community.dart';
@@ -614,6 +614,52 @@ void main() {
       await tester.tap(find.byKey(const Key('club-invite-new')));
       await tester.pumpAndSettle();
       expect(backend.params('create_community_club_invite'), {'p_club_id': clubId});
+    });
+
+    testWidgets('the leader hands the club over; a refusal from the server is shown', (tester) async {
+      backend
+        ..answers['my_community_clubs'] = [clubRow()]
+        ..answers['community_club_members'] = members()
+        ..answers['community_club_invites'] = <Object>[]
+        ..fail['transfer_community_club'] = const CommunityException('The new leader needs an Enterprise account');
+      await pump(tester, const ClubPage(clubId: clubId), signedIn: profile(Plan.enterprise));
+
+      // Dodi has no Enterprise account
+      await tester.tap(find.byKey(const Key('member-menu-u3')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Make club leader'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('needs an Enterprise account'), findsWidgets, reason: 'said before confirming');
+      await tester.tap(find.byKey(const Key('confirm-action')));
+      await tester.pumpAndSettle();
+      expect(find.text('The new leader needs an Enterprise account'), findsOneWidget);
+
+      // Rina has
+      backend.answers['transfer_community_club'] = 'Rina A.';
+      await tester.tap(find.byKey(const Key('member-menu-u2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Make club leader'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-action')));
+      await tester.pumpAndSettle();
+      expect(backend.params('transfer_community_club'), {'p_club_id': clubId, 'p_user_id': 'u2'});
+      expect(find.text('Rina A. now leads the club. You are an admin.'), findsOneWidget);
+    });
+
+    testWidgets('a leader no longer Enterprise can still hand the club over, not manage it', (tester) async {
+      backend
+        ..answers['my_community_clubs'] = [
+          {...clubRow(), 'can_manage': false},
+        ]
+        ..answers['community_club_members'] = members()
+        ..answers['community_club_invites'] = <Object>[];
+      await pump(tester, const ClubPage(clubId: clubId), signedIn: profile(Plan.pro));
+      await tester.tap(find.byKey(const Key('member-menu-u3')));
+      await tester.pumpAndSettle();
+      expect(find.text('Make admin'), findsNothing);
+      expect(find.text('Make club leader'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('an admin manages members but not other admins or roles', (tester) async {

@@ -23,7 +23,7 @@ import '../test/features/track_recorder_panel_test.dart' show MemoryTrackStore;
 import '../test/features/track_recorder_state_test.dart' show FakeGps, FakeTrackCloud;
 
 // The Selo trail up Merbabu, a point a minute, as another app would export it
-Uint8List _seloGpx() {
+Uint8List seloGpx() {
   const trail = [
     (110.4399, -7.4868, 1840.0),
     (110.4372, -7.4790, 2120.0),
@@ -91,7 +91,7 @@ void main() {
         trackLocalStoreProvider.overrideWithValue(MemoryTrackStore()),
         trackCloudProvider.overrideWithValue(FakeTrackCloud()),
         gpsSourceProvider.overrideWithValue(FakeGps()),
-        gpxPickerProvider.overrideWithValue(() async => [(name: 'merbabu.gpx', bytes: _seloGpx())]),
+        gpxPickerProvider.overrideWithValue(() async => [(name: 'merbabu.gpx', bytes: seloGpx())]),
       ],
     );
     addTearDown(c.dispose);

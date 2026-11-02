@@ -61,6 +61,7 @@ dependencies:
   image_picker: ^1.2.4
   xml: ^7.1.0
   file_picker: ^13.3.0
+  pasteboard: ^0.6.0
 
 dev_dependencies:
   integration_test:
