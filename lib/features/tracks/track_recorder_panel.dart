@@ -562,11 +562,13 @@ class _Recording extends ConsumerWidget {
                 background: L360Colors.forest700,
                 foreground: Colors.white,
                 onPressed: () async {
+                  // Taken first: stopping replaces this part of the panel (and its context)
+                  final nav = Navigator.of(context, rootNavigator: true);
                   if (!await _ask(context, 'Finish and save this track?', t.name, 'Save Track')) return;
                   unawaited(HapticFeedback.mediumImpact());
                   await rec.stop();
                   // The moment to share it, like Strava
-                  if (context.mounted) await showTrackSaved(context, t.id);
+                  if (nav.mounted) await showTrackSaved(nav, t.id);
                 },
               ),
             ),
@@ -1222,7 +1224,7 @@ class _TrackCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${formatTrackDate(t.startedAt)} · ${formatTrackDistance(t.stats.distanceM)} · '
-                      '${formatDuration(recording ? t.elapsedAt(_nowMs()) : t.elapsedMs)} · ↑ ${t.stats.elevationGainM.round()} m',
+                      '${formatDuration(recording ? t.elapsedAt(_nowMs()) : t.elapsedMs)} · ↑\u00A0${t.stats.elevationGainM.round()}\u00A0m',
                       style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
                     ),
                     const SizedBox(height: 6),
@@ -1446,58 +1448,59 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
 }
 
 /// After Finish: the track's numbers, Share as image and Post to Community
-Future<void> showTrackSaved(BuildContext context, String trackId) => showModalBottomSheet<void>(
-  context: context,
-  useRootNavigator: true,
-  builder: (sheet) => Consumer(
-    builder: (context, ref, _) {
-      final t = ref.watch(trackRecorderProvider.select((s) => s.tracks.where((x) => x.id == trackId).firstOrNull));
-      return SafeArea(
-        // Short screens and large text: it scrolls
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(L360.gutter, 8, L360.gutter, 16),
-          child: Column(
-            key: const Key('track-saved'),
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.check_circle, color: L360Colors.forest600, size: 40),
-              const SizedBox(height: 8),
-              Text('Track saved', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
-              if (t != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '${t.name}\n${formatTrackDistance(t.stats.distanceM)} · ${formatDuration(t.stats.movingTimeMs > 0 ? t.stats.movingTimeMs : t.elapsedMs)} · ↑ ${t.stats.elevationGainM.round()} m',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: L360Colors.sand600, height: 1.4),
+Future<void> showTrackSaved(NavigatorState nav, String trackId) => nav.push(
+  ModalBottomSheetRoute<void>(
+    isScrollControlled: false,
+    builder: (sheet) => Consumer(
+      builder: (context, ref, _) {
+        final t = ref.watch(trackRecorderProvider.select((s) => s.tracks.where((x) => x.id == trackId).firstOrNull));
+        return SafeArea(
+          // Short screens and large text: it scrolls
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(L360.gutter, 8, L360.gutter, 16),
+            child: Column(
+              key: const Key('track-saved'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(Icons.check_circle, color: L360Colors.forest600, size: 40),
+                const SizedBox(height: 8),
+                Text('Track saved', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+                if (t != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${t.name}\n${formatTrackDistance(t.stats.distanceM)} · ${formatDuration(t.stats.movingTimeMs > 0 ? t.stats.movingTimeMs : t.elapsedMs)} · ↑\u00A0${t.stats.elevationGainM.round()}\u00A0m',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: L360Colors.sand600, height: 1.4),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  key: const Key('track-saved-image'),
+                  style: FilledButton.styleFrom(backgroundColor: L360Colors.ember500),
+                  onPressed: () {
+                    Navigator.pop(sheet);
+                    unawaited(openShareCard(context, trackId));
+                  },
+                  icon: const Icon(Icons.image_outlined),
+                  label: const Text('Share as image'),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('track-saved-post'),
+                  onPressed: () {
+                    Navigator.pop(sheet);
+                    unawaited(openShareCard(context, trackId, post: true));
+                  },
+                  icon: const Icon(Icons.forum_outlined, size: 18),
+                  label: const Text('Post to Community'),
+                ),
+                TextButton(onPressed: () => Navigator.pop(sheet), child: const Text('Done')),
               ],
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                key: const Key('track-saved-image'),
-                style: FilledButton.styleFrom(backgroundColor: L360Colors.ember500),
-                onPressed: () {
-                  Navigator.pop(sheet);
-                  unawaited(openShareCard(context, trackId));
-                },
-                icon: const Icon(Icons.image_outlined),
-                label: const Text('Share as image'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('track-saved-post'),
-                onPressed: () {
-                  Navigator.pop(sheet);
-                  unawaited(openShareCard(context, trackId, post: true));
-                },
-                icon: const Icon(Icons.forum_outlined, size: 18),
-                label: const Text('Post to Community'),
-              ),
-              TextButton(onPressed: () => Navigator.pop(sheet), child: const Text('Done')),
-            ],
+            ),
           ),
-        ),
-      );
-    },
+        );
+      },
+    ),
   ),
 );
