@@ -646,12 +646,24 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   }
 
   /// Points in view above the panels (fitBounds, max zoom 17)
+  /// Camera moves asked for from a page over the map (a club drawing, a workspace item, a saved
+  /// view) wait until the map is on screen again: covered, the map has no size to fit to
+  Future<void> _onScreen() async {
+    for (var i = 0; i < 40 && mounted && !(ModalRoute.of(context)?.isCurrent ?? true); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    // The page's closing animation
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+
   Future<void> _fitPoints(List<(double, double)> points) async {
+    await _onScreen();
     final map = _map;
-    if (map == null) return;
+    if (map == null || !mounted) return;
     final camera = await map.cameraForCoordinates(
       [for (final (lng, lat) in points) Point(coordinates: Position(lng, lat))],
-      MbxEdgeInsets(top: 120, left: 40, bottom: _sheetInset + 260, right: 80),
+      // Below the coordinates card at the top, left of the map buttons
+      MbxEdgeInsets(top: 170, left: 40, bottom: _sheetInset + 260, right: 80),
       null,
       null,
     );
@@ -1165,8 +1177,9 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   /// A saved track in view, clear of the controls and the panel (fitBounds, max zoom 16)
   Future<void> _fitTrack(List<TrackPoint> points) async {
+    await _onScreen();
     final map = _map;
-    if (map == null || points.isEmpty) return;
+    if (map == null || points.isEmpty || !mounted) return;
     final camera = await map.cameraForCoordinates(
       [for (final p in points) Point(coordinates: Position(p.lng, p.lat))],
       MbxEdgeInsets(top: 140, left: 40, bottom: _sheetInset + 320, right: 80),
@@ -1246,14 +1259,16 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (t == null || map == null) return;
       ref.read(cameraToProvider.notifier).done();
       unawaited(
-        map.flyTo(
-          CameraOptions(
-            center: Point(coordinates: Position(t.lng, t.lat)),
-            zoom: t.zoom,
-            pitch: t.pitch,
-            bearing: t.bearing,
+        _onScreen().then(
+          (_) => map.flyTo(
+            CameraOptions(
+              center: Point(coordinates: Position(t.lng, t.lat)),
+              zoom: t.zoom,
+              pitch: t.pitch,
+              bearing: t.bearing,
+            ),
+            MapAnimationOptions(duration: 1500),
           ),
-          MapAnimationOptions(duration: 1500),
         ),
       );
     });
@@ -1302,12 +1317,14 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (target == null || map == null) return;
       ref.read(flyToProvider.notifier).done();
       unawaited(
-        map.flyTo(
-          CameraOptions(
-            center: Point(coordinates: Position(target.lng, target.lat)),
-            zoom: target.zoom,
+        _onScreen().then(
+          (_) => map.flyTo(
+            CameraOptions(
+              center: Point(coordinates: Position(target.lng, target.lat)),
+              zoom: target.zoom,
+            ),
+            MapAnimationOptions(duration: 1200),
           ),
-          MapAnimationOptions(duration: 1200),
         ),
       );
     });

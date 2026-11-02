@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../../data/tracks/gps_source.dart';
 import '../../data/tracks/track_cloud.dart';
 import '../../data/tracks/track_local_store.dart';
 import '../../domain/survey/survey_model.dart' show newUuid;
+import '../../domain/tracks/gpx_import.dart';
 import '../../domain/tracks/recorded_track.dart';
 import '../../domain/tracks/track_recorder_geo.dart';
 
@@ -494,6 +497,58 @@ class TrackRecorderController extends Notifier<TrackRecorderState> {
       viewing: state.viewing?.track.id == id ? () => null : null,
     );
   }
+
+  /// A GPX file from another app into My Tracks (any signed-in account, like the web): kept on
+  /// this phone as a finished offline track until uploaded, and shown on the map. Returns its id,
+  /// or null with the reason in [TrackRecorderState.error].
+  Future<String?> importGpx(Uint8List bytes, String fileName, {int? lastModified}) async {
+    final userId = state.userId;
+    if (userId == null) return null;
+    try {
+      if (bytes.length > gpxImportMaxBytes) throw const GpxImportException('The file is larger than 20 MB');
+      final String text;
+      try {
+        text = utf8.decode(bytes, allowMalformed: true);
+      } on Object {
+        throw const GpxImportException('This is not a valid GPX file');
+      }
+      final (:name, :points) = parseGpx(text, fallbackTime: lastModified ?? _now());
+      final stats = accumulatePoints(points).stats;
+      final startedAt = points.first.timestamp, endedAt = points.last.timestamp;
+      final base = fileName.replaceFirst(RegExp(r'\.gpx$', caseSensitive: false), '').trim();
+      final title = (name?.trim().isNotEmpty ?? false)
+          ? name!.trim()
+          : base.isNotEmpty
+          ? base
+          : defaultTrackName(DateTime.fromMillisecondsSinceEpoch(startedAt));
+      final track = RecordedTrack(
+        id: newUuid(),
+        userId: userId,
+        name: _cut(title),
+        mode: TrackMode.offline,
+        status: TrackStatus.completed,
+        startedAt: startedAt,
+        endedAt: endedAt,
+        elapsedMs: endedAt - startedAt,
+        stats: stats,
+        syncStatus: TrackSyncStatus.local,
+        updatedAt: _now(),
+      );
+      await _enqueue(() => _local.replacePoints(track.id, points));
+      await _persist(track);
+      if (state.userId != userId) return null;
+      // An error of another file picked with it stays shown
+      state = state.copyWith(viewing: () => TrackView(track, points));
+      return track.id;
+    } on Object catch (e) {
+      final why = e is GpxImportException ? e.message : '$e';
+      if (state.userId == userId) state = state.copyWith(error: () => 'Could not import $fileName: $why');
+      return null;
+    }
+  }
+
+  void reportImportError(String fileName, String why) =>
+      state = state.copyWith(error: () => 'Could not import $fileName: $why');
 
   /// (file name, GPX text)
   Future<(String, String)> exportGpx(String id) async {

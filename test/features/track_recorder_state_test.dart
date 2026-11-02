@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -339,6 +341,55 @@ void main() {
     final (name, gpx) = await rec(c).exportGpx(st(c).tracks.single.id);
     expect(name, 'Export_me.gpx');
     expect(RegExp('<trkpt ').allMatches(gpx), hasLength(2));
+  });
+
+  group('GPX import (any signed-in account, like the web)', () {
+    Uint8List file(String body) =>
+        Uint8List.fromList(utf8.encode('<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">$body</gpx>'));
+    const merbabu =
+        '<trk><name>Imported</name><trkseg>'
+        '<trkpt lat="-7.45" lon="110.43"><ele>1800</ele><time>2026-10-01T00:00:00Z</time></trkpt>'
+        '<trkpt lat="-7.46" lon="110.43"><ele>1900</ele><time>2026-10-01T01:00:00Z</time></trkpt>'
+        '</trkseg></trk>';
+
+    test('a GPX file becomes a finished track on this phone and shows on the map', () async {
+      plan = Plan.free;
+      final c = await signedIn();
+      final id = await rec(c).importGpx(file(merbabu), 'merbabu.gpx');
+      expect(st(c).error, isNull);
+      final saved = (await local.listTracks('u1')).single;
+      expect(saved.id, id);
+      expect(
+        (saved.name, saved.mode, saved.status, saved.syncStatus, saved.stats.pointCount),
+        ('Imported', TrackMode.offline, TrackStatus.completed, TrackSyncStatus.local, 2),
+      );
+      expect(saved.elapsedMs, 3600000);
+      expect(saved.stats.elevationGainM, 100);
+      expect(await local.getPoints(saved.id), hasLength(2));
+      expect(st(c).viewing?.track.id, id);
+      expect(st(c).tracks.single.id, id, reason: 'in My Tracks at once');
+      expect(cloud.calls, isNot(contains(startsWith('upload'))), reason: 'kept on the phone until uploaded');
+    });
+
+    test('without a name inside, the file name', () async {
+      final c = await signedIn();
+      await rec(c).importGpx(file('<trk><trkseg><trkpt lat="1" lon="2"/></trkseg></trk>'), 'Day 2.GPX');
+      expect(st(c).tracks.single.name, 'Day 2');
+    });
+
+    test('an invalid file is reported and nothing is saved', () async {
+      final c = await signedIn();
+      expect(await rec(c).importGpx(Uint8List.fromList(utf8.encode('<kml/>')), 'bad.gpx'), isNull);
+      expect(st(c).error, 'Could not import bad.gpx: This is not a valid GPX file');
+      expect(await local.listTracks('u1'), isEmpty);
+    });
+
+    test('not while signed out', () async {
+      final c = await signedIn();
+      auth.add(null);
+      await settle();
+      expect(await rec(c).importGpx(file(merbabu), 'a.gpx'), isNull);
+    });
   });
 
   test('fixes with poor accuracy or jitter are not stored', () async {

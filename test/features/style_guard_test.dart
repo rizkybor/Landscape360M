@@ -13,6 +13,15 @@ void main() {
     await onStyle(() async => throw PlatformException(code: '0', message: "Layer 'route-planner-line' does not exist"));
   });
 
+  test('an update that lands after the map closed is dropped', () async {
+    await onStyle(
+      () async => throw PlatformException(
+        code: 'channel-error',
+        message: 'Unable to establish connection on channel: "…StyleManager.setStyleSourceProperty.0".',
+      ),
+    );
+  });
+
   test('other errors still fail', () async {
     await expectLater(
       onStyle(() async => throw PlatformException(code: '0', message: 'Invalid GeoJSON')),
