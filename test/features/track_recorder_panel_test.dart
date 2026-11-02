@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +36,10 @@ class MemoryTrackStore implements TrackLocalStore {
 
   @override
   Future<void> addPoint(String trackId, int seq, TrackPoint point) async => (points[trackId] ??= {})[seq] = point;
+
+  @override
+  Future<void> replacePoints(String trackId, List<TrackPoint> pts) async =>
+      points[trackId] = {for (final (i, p) in pts.indexed) i: p};
 
   @override
   Future<List<TrackPoint>> getPoints(String trackId) async {
@@ -90,9 +96,14 @@ void main() {
     }
   }
 
-  Future<ProviderContainer> pump(WidgetTester tester, {Plan plan = Plan.enterprise}) async {
+  Future<ProviderContainer> pump(
+    WidgetTester tester, {
+    Plan plan = Plan.enterprise,
+    List<PickedGpx> picked = const [],
+  }) async {
     final c = ProviderContainer(
       overrides: [
+        gpxPickerProvider.overrideWithValue(() async => picked),
         trackLocalStoreProvider.overrideWithValue(local),
         trackCloudProvider.overrideWithValue(cloud),
         gpsSourceProvider.overrideWithValue(gps),
@@ -248,5 +259,33 @@ void main() {
     await settle(tester);
     expect(find.text('by friend@example.com'), findsOneWidget);
     expect(find.textContaining('IN PROGRESS'), findsOneWidget);
+  });
+
+  testWidgets('Import GPX: a Pro account imports a file from another app; the sheet closes onto the map', (
+    tester,
+  ) async {
+    final gpx = Uint8List.fromList(
+      utf8.encode(
+        '<gpx version="1.1"><trk><name>From Strava</name><trkseg>'
+        '<trkpt lat="-7.45" lon="110.43"><ele>1800</ele><time>2026-10-01T00:00:00Z</time></trkpt>'
+        '<trkpt lat="-7.46" lon="110.43"><ele>1900</ele><time>2026-10-01T01:00:00Z</time></trkpt>'
+        '</trkseg></trk></gpx>',
+      ),
+    );
+    final c = await pump(
+      tester,
+      plan: Plan.pro,
+      picked: [(name: 'too-big.gpx', bytes: null), (name: 'strava.gpx', bytes: gpx)],
+    );
+    await tester.tap(find.byKey(const Key('track-list')));
+    await settle(tester);
+    expect(find.textContaining('import a GPX file'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('track-import')));
+    await settle(tester);
+    final s = c.read(trackRecorderProvider);
+    expect(s.tracks.single.name, 'From Strava');
+    expect(s.viewing?.track.name, 'From Strava');
+    expect(s.error, 'Could not import too-big.gpx: The file is larger than 20 MB');
+    expect(find.byKey(const Key('track-import')), findsNothing, reason: 'the sheet closed onto the map');
   });
 }

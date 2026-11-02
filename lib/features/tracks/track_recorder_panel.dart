@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/tracks/gps_source.dart';
+import '../../domain/tracks/gpx_import.dart' show gpxImportMaxBytes;
 import '../../domain/tracks/recorded_track.dart';
 import '../../domain/tracks/track_recorder_geo.dart';
 import 'track_recorder_state.dart';
@@ -18,6 +20,19 @@ import 'track_recorder_state.dart';
 // tracks open in a sheet.
 
 const contactAdminLabel = 'Hubungi Admin';
+
+/// A file picked for import: its name and contents (null when larger than the import limit)
+typedef PickedGpx = ({String name, Uint8List? bytes});
+
+/// GPX files from Files, Drive or another app (any file type: iOS has no system type for GPX);
+/// tests replace it
+final gpxPickerProvider = Provider<Future<List<PickedGpx>> Function()>(
+  (ref) =>
+      () async => [
+        for (final f in await FilePicker.pickFiles())
+          (name: f.name, bytes: (f.lengthSync() ?? 0) > gpxImportMaxBytes ? null : await f.readAsBytes()),
+      ],
+);
 
 String _gpsLabel(GpsStatus s) => switch (s) {
   GpsStatus.idle => 'GPS idle',
@@ -277,7 +292,10 @@ class _Locked extends StatelessWidget {
                   text: contactAdminLabel,
                   style: TextStyle(fontWeight: FontWeight.w700, color: L360Colors.ember600),
                 ),
-                TextSpan(text: ' to enable it. You can still view your tracks and tracks shared with you.'),
+                TextSpan(
+                  text:
+                      ' to enable it. You can still view your tracks and tracks shared with you, and import GPX files.',
+                ),
               ],
             ),
             style: TextStyle(fontSize: 13, color: L360Colors.sand700, height: 1.35),
@@ -799,6 +817,33 @@ class _TracksSheet extends ConsumerStatefulWidget {
 
 class _TracksSheetState extends ConsumerState<_TracksSheet> {
   bool _shared = false;
+  bool _importing = false;
+
+  /// One or more GPX files into My Tracks; the last one opens on the map
+  Future<void> _import() async {
+    final rec = ref.read(trackRecorderProvider.notifier)..clearError();
+    setState(() => _importing = true);
+    String? last;
+    try {
+      final files = await ref.read(gpxPickerProvider)();
+      for (final f in files) {
+        final bytes = f.bytes;
+        if (bytes == null) {
+          rec.reportImportError(f.name, 'The file is larger than 20 MB');
+        } else {
+          last = await rec.importGpx(bytes, f.name) ?? last;
+        }
+      }
+    } on Object catch (e) {
+      rec.reportImportError('the file', '$e');
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+    if (last != null && mounted) {
+      setState(() => _shared = false);
+      Navigator.pop(context);
+    }
+  }
 
   @override
   void initState() {
@@ -831,6 +876,15 @@ class _TracksSheetState extends ConsumerState<_TracksSheet> {
         Row(
           children: [
             Expanded(child: Text('Tracks', style: Theme.of(context).textTheme.titleLarge)),
+            TextButton.icon(
+              key: const Key('track-import'),
+              style: TextButton.styleFrom(foregroundColor: L360Colors.ember600),
+              onPressed: _importing ? null : _import,
+              icon: _importing
+                  ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.upload_file, size: 18),
+              label: const Text('Import GPX'),
+            ),
             IconButton(
               tooltip: 'Refresh',
               onPressed: s.loadingTracks || s.loadingShared
@@ -880,7 +934,10 @@ class _TracksSheetState extends ConsumerState<_TracksSheet> {
               onTap: t.id == s.active?.id ? null : () => _show(t.id),
               onMore: t.id == s.active?.id ? null : () => _trackActions(context, t),
             ),
-          if (mine.isEmpty) _Empty(s.loadingTracks ? 'Loading tracks…' : 'No tracks yet. Start your first recording.'),
+          if (mine.isEmpty)
+            _Empty(
+              s.loadingTracks ? 'Loading tracks…' : 'No tracks yet. Record one, or import a GPX file from another app.',
+            ),
         ] else ...[
           for (final (i, sh) in s.shared.indexed)
             _TrackCard(

@@ -18,6 +18,9 @@ abstract interface class TrackLocalStore {
   Future<List<RecordedTrack>> listTracks(String userId);
   Future<void> addPoint(String trackId, int seq, TrackPoint point);
   Future<List<TrackPoint>> getPoints(String trackId);
+
+  /// All of a track's points at once (an imported GPX file), replacing any there were
+  Future<void> replacePoints(String trackId, List<TrackPoint> points);
   Future<void> deleteTrack(String trackId);
 }
 
@@ -107,6 +110,18 @@ class SqliteTrackStore implements TrackLocalStore {
       orderBy: 'seq',
     );
     return [for (final r in rows) TrackPoint.fromJson(jsonDecode(r['data']! as String) as Map<String, dynamic>)];
+  }
+
+  @override
+  Future<void> replacePoints(String trackId, List<TrackPoint> points) async {
+    await (await _open).transaction((tx) async {
+      await tx.delete('points', where: 'track_id = ?', whereArgs: [trackId]);
+      final batch = tx.batch();
+      for (final (i, pt) in points.indexed) {
+        batch.insert('points', {'track_id': trackId, 'seq': i, 'data': jsonEncode(pt.toJson())});
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   @override

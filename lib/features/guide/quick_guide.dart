@@ -77,8 +77,9 @@ const _entries = <(IconData, String, String)>[
     Icons.directions_walk,
     'Track Recorder [Enterprise Account]',
     'Record personal GPS tracks online or offline with distance, duration and elevation. Share tracks by email and '
-        'export GPX. Every signed-in account can view its own and shared tracks; Pro and Enterprise accounts can '
-        'rename their cloud tracks.',
+        'export GPX. Every signed-in account can view its own and shared tracks and import GPX files from other apps '
+        '(kept on this phone; Enterprise can upload them to the cloud); Pro and Enterprise accounts can rename their '
+        'cloud tracks.',
   ),
   (
     Icons.cloud_outlined,
