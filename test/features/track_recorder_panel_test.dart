@@ -252,7 +252,7 @@ void main() {
     await tester.tap(find.byKey(const Key('track-list')));
     await settle(tester);
     expect(find.text('Merbabu'), findsOneWidget);
-    expect(find.textContaining('5.23 km · 01:02:03 · ↑ 812 m'), findsOneWidget);
+    expect(find.textContaining('5.23 km · 01:02:03 · ↑\u00A0812\u00A0m'), findsOneWidget);
     expect(find.text('PHONE ONLY'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('more-t1')));

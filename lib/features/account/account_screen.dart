@@ -9,6 +9,9 @@ import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
 import '../../domain/account/account_rules.dart';
 import '../../domain/account/profile.dart';
+import '../community/community_club_page.dart' show openClub;
+import '../community/community_clubs.dart' show ClubAvatar;
+import '../community/community_state.dart' show myClubsProvider;
 import '../offline/offline_state.dart' show offlineSheetRequestProvider;
 import '../sos/sos_alerts.dart';
 import '../sos/sos_screen.dart';
@@ -129,6 +132,7 @@ class _AccountBody extends ConsumerWidget {
                 const SizedBox(height: 16),
                 const _StorageCard(),
                 const SizedBox(height: 24),
+                const _ClubsSection(),
                 GroupedSection(
                   title: 'Settings',
                   children: [
@@ -238,6 +242,33 @@ class _AccountBody extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The Community clubs the account belongs to, with its role in each; tap one to open it.
+/// Nothing when it is in none.
+class _ClubsSection extends ConsumerWidget {
+  const _ClubsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clubs = ref.watch(myClubsProvider).value ?? const [];
+    if (clubs.isEmpty) return const SizedBox.shrink();
+    return GroupedSection(
+      key: const Key('account-clubs'),
+      title: clubs.length == 1 ? 'Club' : 'Clubs',
+      children: [
+        for (final c in clubs)
+          ListTile(
+            key: Key('account-club-${c.id}'),
+            leading: ClubAvatar(club: c, size: 36),
+            title: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text('${c.role.label} · ${c.memberCount} member${c.memberCount == 1 ? '' : 's'}'),
+            trailing: const Icon(Icons.chevron_right, color: L360Colors.sand400),
+            onTap: () => openClub(context, c.id),
+          ),
+      ],
     );
   }
 }
