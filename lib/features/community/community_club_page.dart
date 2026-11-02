@@ -279,6 +279,26 @@ class _MembersTabState extends ConsumerState<_MembersTab> {
     _changed();
   });
 
+  /// Hands the club over; the server checks the new leader is Enterprise
+  Future<void> _makeLeader(ClubMember m) async {
+    if (!await confirmDialog(
+      context,
+      title: 'Make ${m.name} the club leader?',
+      message:
+          '${m.name} will lead and manage the club, and you stay in it as an admin. '
+          'The new leader needs an Enterprise account. Only the new leader can hand the club over again.',
+      action: 'Make leader',
+      destructive: false,
+    )) {
+      return;
+    }
+    await _run(() async {
+      final name = await ref.read(communityRepositoryProvider).transferClub(_club.id, m.userId);
+      _changed();
+      if (mounted) showSnack(context, '${name.isEmpty ? m.name : name} now leads the club. You are an admin.');
+    });
+  }
+
   Future<void> _leave(ClubMember me) async {
     if (!await confirmDialog(
       context,
@@ -411,19 +431,23 @@ class _MembersTabState extends ConsumerState<_MembersTab> {
 
   Widget? _memberMenu(ClubMember m) {
     final setRole = _club.isOwner && _club.canManage && m.role != ClubRole.owner;
+    // Also while the leader is no longer Enterprise: handing over is how the club gets managed again
+    final leader = _club.isOwner && m.role != ClubRole.owner;
     final remove = _canRemove(m);
-    if (!setRole && !remove) return null;
+    if (!setRole && !leader && !remove) return null;
     return PopupMenuButton<String>(
       key: Key('member-menu-${m.userId}'),
       enabled: !_busy,
       onSelected: (v) => switch (v) {
         'admin' => _setRole(m, ClubRole.admin),
         'member' => _setRole(m, ClubRole.member),
+        'leader' => _makeLeader(m),
         _ => _remove(m),
       },
       itemBuilder: (_) => [
         if (setRole && m.role == ClubRole.member) const PopupMenuItem(value: 'admin', child: Text('Make admin')),
         if (setRole && m.role == ClubRole.admin) const PopupMenuItem(value: 'member', child: Text('Remove admin role')),
+        if (leader) const PopupMenuItem(value: 'leader', child: Text('Make club leader')),
         if (remove) const PopupMenuItem(value: 'remove', child: Text('Remove from club')),
       ],
     );

@@ -365,6 +365,11 @@ class CommunityRepository {
     'p_role': role == ClubRole.admin ? 'admin' : 'member',
   });
 
+  /// The leader hands the club over to a member with an Enterprise account; the old leader stays
+  /// as an admin (20261102000031). Returns the new leader's name.
+  Future<String> transferClub(String clubId, String userId) async =>
+      '${await backend.rpc('transfer_community_club', {'p_club_id': clubId, 'p_user_id': userId})}';
+
   /// Seen the club's feed: its "new posts" count starts again
   Future<void> markClubRead(String clubId) => backend.rpc('mark_community_club_read', {'p_club_id': clubId});
 

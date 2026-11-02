@@ -192,6 +192,13 @@ void main() {
     await settle(tester);
     expect(c.read(trackRecorderProvider).active, isNull);
     expect(local.tracks.values.single.status, TrackStatus.completed);
+    // The moment to share it: Share as image / Post to Community
+    expect(find.text('Track saved'), findsOneWidget);
+    expect(find.byKey(const Key('track-saved-image')), findsOneWidget);
+    expect(find.byKey(const Key('track-saved-post')), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await settle(tester);
+    expect(find.text('Track saved'), findsNothing);
   });
 
   testWidgets('closing the panel while recording leaves the REC pill, which opens it again', (tester) async {

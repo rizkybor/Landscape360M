@@ -115,7 +115,11 @@ void main() {
     container.read(basemapsProvider.notifier).setOpacity('red', 0.3);
     await wait(tester, 1500);
     final faint = await centre();
-    expect((faint.r * 255).round(), lessThan((full.r * 255).round() - 80), reason: 'the map shows through at 30%: $faint');
+    expect(
+      (faint.r * 255).round(),
+      lessThan((full.r * 255).round() - 80),
+      reason: 'the map shows through at 30%: $faint',
+    );
 
     await container.read(basemapsProvider.notifier).setActive('red', false);
     await wait(tester, 1500);

@@ -459,6 +459,13 @@ class TrackRecorderController extends Notifier<TrackRecorderState> {
 
   void closeView() => state = state.copyWith(viewing: () => null);
 
+  /// A track with its points, without showing it (a share card)
+  Future<TrackView?> load(String id) async {
+    final t = await _find(id);
+    if (t == null) return null;
+    return TrackView(t, await _points(t));
+  }
+
   Future<void> rename(String id, String name) async {
     final trimmed = _cut(name.trim());
     final t = await _find(id);

@@ -13,6 +13,7 @@ import '../../data/tracks/gps_source.dart';
 import '../../domain/tracks/gpx_import.dart' show gpxImportMaxBytes;
 import '../../domain/tracks/recorded_track.dart';
 import '../../domain/tracks/track_recorder_geo.dart';
+import 'share_card_page.dart';
 import 'track_recorder_state.dart';
 
 // The Track Recorder above the sheet (TrackRecorderPanel.tsx): start a recording, its live
@@ -564,6 +565,8 @@ class _Recording extends ConsumerWidget {
                   if (!await _ask(context, 'Finish and save this track?', t.name, 'Save Track')) return;
                   unawaited(HapticFeedback.mediumImpact());
                   await rec.stop();
+                  // The moment to share it, like Strava
+                  if (context.mounted) await showTrackSaved(context, t.id);
                 },
               ),
             ),
@@ -989,7 +992,10 @@ class _TracksSheetState extends ConsumerState<_TracksSheet> {
         viewing ? Icons.visibility_off_outlined : Icons.visibility_outlined,
         viewing ? 'Hide from map' : 'Show on map',
       ),
-      if (t.syncStatus != TrackSyncStatus.remote || online) ('gpx', Icons.ios_share, 'Export GPX'),
+      if (t.syncStatus != TrackSyncStatus.remote || online) ...[
+        ('image', Icons.image_outlined, 'Share as image'),
+        ('gpx', Icons.ios_share, 'Export GPX'),
+      ],
       if (canRecord && online) ('share', Icons.group_add_outlined, 'Share with an account'),
       if (canUpload) ('upload', Icons.cloud_upload_outlined, 'Upload to cloud'),
       if (canRename) ('rename', Icons.edit_outlined, 'Rename'),
@@ -1001,6 +1007,9 @@ class _TracksSheetState extends ConsumerState<_TracksSheet> {
         await _show(t.id);
       case 'hide':
         rec.closeView();
+      case 'image':
+        Navigator.pop(context); // the tracks sheet: the card opens over the map
+        await openShareCard(context, t.id);
       case 'gpx':
         await _export(t.id);
       case 'share':
@@ -1435,3 +1444,60 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
     ),
   );
 }
+
+/// After Finish: the track's numbers, Share as image and Post to Community
+Future<void> showTrackSaved(BuildContext context, String trackId) => showModalBottomSheet<void>(
+  context: context,
+  useRootNavigator: true,
+  builder: (sheet) => Consumer(
+    builder: (context, ref, _) {
+      final t = ref.watch(trackRecorderProvider.select((s) => s.tracks.where((x) => x.id == trackId).firstOrNull));
+      return SafeArea(
+        // Short screens and large text: it scrolls
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(L360.gutter, 8, L360.gutter, 16),
+          child: Column(
+            key: const Key('track-saved'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.check_circle, color: L360Colors.forest600, size: 40),
+              const SizedBox(height: 8),
+              Text('Track saved', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+              if (t != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${t.name}\n${formatTrackDistance(t.stats.distanceM)} · ${formatDuration(t.stats.movingTimeMs > 0 ? t.stats.movingTimeMs : t.elapsedMs)} · ↑ ${t.stats.elevationGainM.round()} m',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: L360Colors.sand600, height: 1.4),
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('track-saved-image'),
+                style: FilledButton.styleFrom(backgroundColor: L360Colors.ember500),
+                onPressed: () {
+                  Navigator.pop(sheet);
+                  unawaited(openShareCard(context, trackId));
+                },
+                icon: const Icon(Icons.image_outlined),
+                label: const Text('Share as image'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('track-saved-post'),
+                onPressed: () {
+                  Navigator.pop(sheet);
+                  unawaited(openShareCard(context, trackId, post: true));
+                },
+                icon: const Icon(Icons.forum_outlined, size: 18),
+                label: const Text('Post to Community'),
+              ),
+              TextButton(onPressed: () => Navigator.pop(sheet), child: const Text('Done')),
+            ],
+          ),
+        ),
+      );
+    },
+  ),
+);
