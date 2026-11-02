@@ -16,7 +16,11 @@ AccountProfile _profile(Map<String, dynamic> row) =>
 void main() {
   group('paid plan end date', () {
     test('a running paid plan keeps its plan and end date', () {
-      final p = _profile({'status_subscribe': 'Enterprise', 'status_user': 'monitor360', 'subscription_expires_at': '2026-11-30T12:00:00Z'});
+      final p = _profile({
+        'status_subscribe': 'Enterprise',
+        'status_user': 'monitor360',
+        'subscription_expires_at': '2026-11-30T12:00:00Z',
+      });
       expect((p.plan, p.role, p.daysLeft(_now), p.endsSoon(_now)), (Plan.enterprise, UserRole.monitor360, 29, false));
       expect(planEndText(p, _now), 'Active until 30 November 2026');
     });
@@ -30,8 +34,15 @@ void main() {
     });
 
     test('a plan that ran out is Free; admin and hand-set plans have no end', () {
-      final ended = _profile({'status_subscribe': 'Enterprise', 'status_user': 'monitor360', 'subscription_expires_at': '2026-10-31T00:00:00Z'});
-      expect((ended.plan, ended.role, ended.canMonitor, planEndText(ended, _now)), (Plan.free, UserRole.pengguna360, false, null));
+      final ended = _profile({
+        'status_subscribe': 'Enterprise',
+        'status_user': 'monitor360',
+        'subscription_expires_at': '2026-10-31T00:00:00Z',
+      });
+      expect(
+        (ended.plan, ended.role, ended.canMonitor, planEndText(ended, _now)),
+        (Plan.free, UserRole.pengguna360, false, null),
+      );
       expect(planEndText(_profile({'status_subscribe': 'Pro'}), _now), isNull);
       final admin = _profile({'is_admin': true, 'subscription_expires_at': '2026-10-31T00:00:00Z'});
       expect((admin.plan, admin.subscriptionExpiresAt), (Plan.enterprise, null));

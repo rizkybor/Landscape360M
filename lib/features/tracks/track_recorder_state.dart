@@ -370,8 +370,10 @@ class TrackRecorderController extends Notifier<TrackRecorderState> {
   }
 
   Future<void> sync(String id) async {
+    // A timer or upload can outlive the controller (signed out, app closed): stop at each gap
+    if (!ref.mounted) return;
     final t = await _find(id);
-    if (t == null || !_own(t) || t.syncStatus == TrackSyncStatus.remote) return;
+    if (!ref.mounted || t == null || !_own(t) || t.syncStatus == TrackSyncStatus.remote) return;
     if (!_online) {
       await _persist(
         t.copyWith(syncStatus: t.syncStatus == TrackSyncStatus.local ? TrackSyncStatus.local : TrackSyncStatus.pending),
@@ -383,6 +385,7 @@ class TrackRecorderController extends Notifier<TrackRecorderState> {
       await _writes;
       final points = await _local.getPoints(t.id);
       await _cloud.upload(t, points);
+      if (!ref.mounted) return;
       final latest = await _find(id) ?? t;
       // Points recorded during the upload still need another one
       final stillDirty = latest.updatedAt > snapshotUpdatedAt;
@@ -394,6 +397,7 @@ class TrackRecorderController extends Notifier<TrackRecorderState> {
         ),
       );
     } on Object catch (e) {
+      if (!ref.mounted) return;
       final latest = await _find(id) ?? t;
       await _persist(latest.copyWith(syncStatus: TrackSyncStatus.error, syncError: () => '$e'));
     }

@@ -82,11 +82,13 @@ class FakeGps implements GpsSource {
 
   bool get watching => controller != null && !controller!.isClosed && controller!.hasListener;
 
-  @override
-  Future<GpsAccess> access() async => GpsAccess.allowed;
+  GpsAccess accessResult = GpsAccess.allowed;
 
   @override
-  Future<GpsAccess> request() async => GpsAccess.allowed;
+  Future<GpsAccess> access() async => accessResult;
+
+  @override
+  Future<GpsAccess> request() async => accessResult;
 
   @override
   Future<void> openSettings() async {}
@@ -97,6 +99,9 @@ class FakeGps implements GpsSource {
     controller = StreamController<GpsFix>();
     return controller!.stream;
   }
+
+  @override
+  Stream<GpsFix> watchSparse() => watch();
 }
 
 AccountProfile _profile(Plan plan, {bool admin = false}) => AccountProfile(

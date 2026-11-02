@@ -9,7 +9,11 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 import '../../core/theme/app_theme.dart';
 import '../../domain/community/community.dart';
 import '../../domain/community/community_attachments.dart';
+import '../../domain/community/community_events.dart';
+import '../map/map_tools_state.dart';
 import '../map/style_guard.dart';
+import 'community_events_ui.dart' show openEvent;
+import 'community_live_state.dart';
 import 'community_post_page.dart';
 import 'community_state.dart';
 import 'community_widgets.dart';
@@ -21,6 +25,9 @@ import 'community_widgets.dart';
 
 const communityPointsLayer = 'community-points';
 const communityClustersLayer = 'community-clusters';
+const communityLiveLayer = 'community-live-dots';
+const _live = 'community-live';
+const _liveTrail = 'community-live-trail';
 const _source = 'community-posts';
 const _focus = 'community-focus';
 const _empty = <String, Object>{'type': 'FeatureCollection', 'features': <Object>[]};
@@ -69,6 +76,45 @@ Map<String, Object> communityGeoJson(List<CommunityPost> posts) => {
         'geometry': {
           'type': 'Point',
           'coordinates': [p.lng, p.lat],
+        },
+      },
+  ],
+};
+
+/// Everyone's last position on the live map: a dot and the name, faded when older than 15 min
+Map<String, Object> liveGeoJson(List<LivePosition> positions, DateTime now) => {
+  'type': 'FeatureCollection',
+  'features': [
+    for (final p in positions)
+      {
+        'type': 'Feature',
+        'properties': {
+          'id': p.userId,
+          'name': p.isMe ? '${p.name} (you)' : p.name,
+          'faded': p.fadedAt(now),
+          'me': p.isMe,
+        },
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [p.lng, p.lat],
+        },
+      },
+  ],
+};
+
+/// One person's trail on the live map
+Map<String, Object> liveTrailGeoJson(List<TrailPoint> trail) => {
+  'type': 'FeatureCollection',
+  'features': [
+    if (trail.length >= 2)
+      {
+        'type': 'Feature',
+        'properties': <String, Object>{},
+        'geometry': {
+          'type': 'LineString',
+          'coordinates': [
+            for (final p in trail) [p.lng, p.lat],
+          ],
         },
       },
   ],
@@ -146,8 +192,10 @@ class CommunityLayer {
         jsonEncode({'type': 'geojson', 'data': _empty, 'cluster': true, 'clusterRadius': 40, 'clusterMaxZoom': 11}),
       );
     }
-    if (!await map.styleSourceExists(_focus)) {
-      await map.addStyleSource(_focus, jsonEncode({'type': 'geojson', 'data': _empty}));
+    for (final id in [_focus, _live, _liveTrail]) {
+      if (!await map.styleSourceExists(id)) {
+        await map.addStyleSource(id, jsonEncode({'type': 'geojson', 'data': _empty}));
+      }
     }
     for (final layer in [
       {
@@ -208,6 +256,64 @@ class CommunityLayer {
             ['has', 'post'],
             0,
             3,
+          ],
+        },
+      },
+      {
+        'id': '$_liveTrail-line',
+        'type': 'line',
+        'source': _liveTrail,
+        'layout': {'line-join': 'round', 'line-cap': 'round'},
+        'paint': {'line-color': '#2563eb', 'line-width': 3.5, 'line-opacity': 0.85},
+      },
+      {
+        'id': communityLiveLayer,
+        'type': 'circle',
+        'source': _live,
+        'paint': {
+          'circle-radius': 8,
+          'circle-color': [
+            'case',
+            ['get', 'me'],
+            '#e46c24',
+            '#2563eb',
+          ],
+          'circle-opacity': [
+            'case',
+            ['get', 'faded'],
+            0.4,
+            1,
+          ],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-opacity': [
+            'case',
+            ['get', 'faded'],
+            0.5,
+            1,
+          ],
+        },
+      },
+      {
+        'id': '$_live-names',
+        'type': 'symbol',
+        'source': _live,
+        'layout': {
+          'text-field': ['get', 'name'],
+          'text-size': 12,
+          'text-anchor': 'bottom',
+          'text-offset': [0, -1.1],
+          'text-allow-overlap': true,
+        },
+        'paint': {
+          'text-color': '#1a2214',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.5,
+          'text-opacity': [
+            'case',
+            ['get', 'faded'],
+            0.5,
+            1,
           ],
         },
       },
@@ -276,6 +382,13 @@ class CommunityLayer {
   }
 
   Future<void> show(CommunityLayerState s, MapFocus? focus) => onStyle(() => _show(s, focus));
+
+  /// The live map of an event (null: none)
+  Future<void> showLive(LiveViewState? v, DateTime now) => onStyle(() async {
+    if (!_installed) return;
+    await map.setStyleSourceProperty(_live, 'data', v == null ? _empty : liveGeoJson(v.positions, now));
+    await map.setStyleSourceProperty(_liveTrail, 'data', v == null ? _empty : liveTrailGeoJson(v.trail));
+  });
 
   Future<void> _show(CommunityLayerState s, MapFocus? focus) async {
     if (!_installed) return;
@@ -376,6 +489,178 @@ class CommunityFocusCard extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// While sharing: "Sharing your position with (club) until (time)", Stop; tap for the event
+class CommunityLiveBanner extends ConsumerWidget {
+  const CommunityLiveBanner({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final live = ref.watch(communityLiveProvider);
+    final now = ref.watch(communityClockProvider)();
+    final eventId = live.eventId;
+    if (eventId == null) {
+      final message = live.endedMessage;
+      if (message == null) return const SizedBox.shrink();
+      return Material(
+        key: const Key('community-live-ended'),
+        color: L360Colors.ink,
+        borderRadius: BorderRadius.circular(L360.radius),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 13)),
+              ),
+              IconButton(
+                tooltip: 'Close',
+                color: Colors.white,
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: ref.read(communityLiveProvider.notifier).clearMessage,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Material(
+      key: const Key('community-live-banner'),
+      color: L360Colors.forest800,
+      borderRadius: BorderRadius.circular(L360.radius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(L360.radius),
+        onTap: () => openEvent(context, eventId),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+          child: Row(
+            children: [
+              const Icon(Icons.share_location, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sharing your position with ${live.clubName}'
+                      '${live.endsAt == null ? '' : ' until ${formatUntil(live.endsAt!, now)}'}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                    Text(
+                      [
+                        live.title,
+                        if (live.pending > 0) '${live.pending} waiting for signal',
+                        ?live.gpsError,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                key: const Key('community-live-stop'),
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                onPressed: () => ref.read(communityLiveProvider.notifier).stop(),
+                child: const Text('Stop'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The live map of an event: who is on it, tap a name for their trail, close
+class CommunityLiveMapCard extends ConsumerWidget {
+  const CommunityLiveMapCard({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final v = ref.watch(communityLiveViewProvider);
+    if (v == null) return const SizedBox.shrink();
+    final now = ref.watch(communityClockProvider)();
+    final view = ref.read(communityLiveViewProvider.notifier);
+    return Material(
+      key: const Key('community-live-map'),
+      color: Colors.white,
+      elevation: 6,
+      shadowColor: const Color(0x40000000),
+      borderRadius: BorderRadius.circular(L360.radius),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 4, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.share_location, size: 18, color: L360Colors.forest700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => openEvent(context, v.eventId),
+                    child: Text(
+                      'Live: ${v.title}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('community-live-map-close'),
+                  tooltip: 'Close',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: view.close,
+                ),
+              ],
+            ),
+            if (v.error != null) Text(v.error!, style: const TextStyle(fontSize: 12, color: L360Colors.brick500)),
+            if (v.positions.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Text(
+                  'No one has shared a position yet.',
+                  style: TextStyle(fontSize: 12, color: L360Colors.sand600),
+                ),
+              )
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final p in v.positions) ...[
+                      PillChip(
+                        key: Key('live-${p.userId}'),
+                        label:
+                            '${p.isMe ? 'You' : p.name} · ${timeAgo(p.recordedAt, now)}'
+                            '${p.battery == null ? '' : ' · ${p.battery}%'}',
+                        on: v.trailUserId == p.userId,
+                        leading: Icon(
+                          Icons.circle,
+                          size: 10,
+                          color: p.fadedAt(now) ? L360Colors.sand400 : L360Colors.forest600,
+                        ),
+                        onTap: () {
+                          view.showTrail(p.userId);
+                          ref.read(flyToProvider.notifier).go(p.lng, p.lat, zoom: 15);
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -59,6 +59,15 @@ const _entries = <(IconData, String, String)>[
         'focus view without signing in. Free 5 areas, Pro 10, Enterprise 20; links on Pro and Enterprise.',
   ),
   (
+    Icons.forum_outlined,
+    'Community & Clubs [All Accounts]',
+    'Read trail reports and stories from other hikers on the map, also without an account. Signed in, post a trail '
+        'report with photos (it waits on the phone without signal) or a story, mark posts helpful and comment. '
+        'Enterprise accounts start clubs; members post to the club only, share map data in its workspace and join '
+        'its events. For an event, "Share my position" lets club members follow you on the live map until it ends, '
+        'also with the screen off.',
+  ),
+  (
     Icons.share_outlined,
     'Share Location',
     'Tap the share button on the right of the map to send where you are now to WhatsApp or another app, with '

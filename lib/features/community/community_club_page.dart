@@ -14,16 +14,19 @@ import '../../domain/marked/marked_areas.dart' show formatLength;
 import '../../domain/share/share_location.dart' show ClassicLink;
 import '../account/sign_in_sheet.dart';
 import '../map/shared_links.dart';
+import 'club_map_ui.dart' show ClubMapTab;
 import 'community_attach.dart';
 import 'community_clubs.dart';
+import 'community_events_ui.dart' show ClubEventsTab;
 import 'community_state.dart';
 import 'community_widgets.dart';
 
-// One club (20261102000025–27): the profile, its posts, and two tabs. Members: roles (the
+// One club (20261102000025–30): the profile, its posts, and four tabs. Members: roles (the
 // leader makes members admins), adding by email, removing, invite links (7 days) and leaving.
 // Workspace: copies of members' tracks, areas, locations and Field Works in folders, shown on
-// the map. The leader and admins manage; any member adds to the workspace. Also the card an
-// invite link (/?join=) opens, with Join.
+// the map. Events: expeditions (community_events_ui.dart). Map: shared drawings and
+// saved views (club_map_ui.dart). The leader and admins manage; any
+// member adds to the workspace. Also the card an invite link (/?join=) opens, with Join.
 
 final clubInvitesProvider = FutureProvider.family<List<ClubInvite>, String>(
   (ref, clubId) => ref.watch(communityRepositoryProvider).invites(clubId),
@@ -92,7 +95,7 @@ class _ClubPageState extends ConsumerState<ClubPage> {
         .where((c) => c.id == widget.clubId)
         .firstOrNull;
     return DefaultTabController(
-      length: 2,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text(club?.name ?? 'Club'),
@@ -109,8 +112,11 @@ class _ClubPageState extends ConsumerState<ClubPage> {
           ],
           bottom: const TabBar(
             tabs: [
+              // The web's order: Members / Events / Map / Files (the workspace)
               Tab(key: Key('club-tab-members'), text: 'Members'),
-              Tab(key: Key('club-tab-workspace'), text: 'Workspace'),
+              Tab(key: Key('club-tab-events'), text: 'Events'),
+              Tab(key: Key('club-tab-map'), text: 'Map'),
+              Tab(key: Key('club-tab-workspace'), text: 'Files'),
             ],
           ),
         ),
@@ -119,6 +125,8 @@ class _ClubPageState extends ConsumerState<ClubPage> {
             : TabBarView(
                 children: [
                   _MembersTab(club: club, header: _header(club)),
+                  ClubEventsTab(club: club),
+                  ClubMapTab(club: club),
                   _WorkspaceTab(club: club),
                 ],
               ),

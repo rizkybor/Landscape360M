@@ -26,8 +26,9 @@ final communityBackendProvider = Provider<CommunityBackend>(
 
 final communityPrefsProvider = Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
 
-class _PrefsStorage implements OutboxStorage {
-  _PrefsStorage(this.prefs);
+/// Key-value storage in the app's preferences (feed cache, outbox, live sharing)
+class PrefsOutboxStorage implements OutboxStorage {
+  PrefsOutboxStorage(this.prefs);
   final SharedPreferencesAsync prefs;
 
   @override
@@ -40,7 +41,7 @@ class _PrefsStorage implements OutboxStorage {
 final communityRepositoryProvider = Provider<CommunityRepository>(
   (ref) => CommunityRepository(
     backend: ref.watch(communityBackendProvider),
-    cache: _PrefsStorage(ref.watch(communityPrefsProvider)),
+    cache: PrefsOutboxStorage(ref.watch(communityPrefsProvider)),
   ),
 );
 
@@ -48,7 +49,7 @@ final communityOutboxFilesProvider = Provider<OutboxFiles>((ref) => DiskOutboxFi
 
 final communityOutboxStoreProvider = Provider<CommunityOutbox>(
   (ref) => CommunityOutbox(
-    storage: _PrefsStorage(ref.watch(communityPrefsProvider)),
+    storage: PrefsOutboxStorage(ref.watch(communityPrefsProvider)),
     files: ref.watch(communityOutboxFilesProvider),
     repository: () => ref.read(communityRepositoryProvider),
   ),
@@ -477,22 +478,71 @@ class ComposeDraft {
   );
 }
 
-class CommunityPick {
-  const CommunityPick(this.draft, [this.picked]);
+/// A club event's form, kept while its meeting point is picked on the map
+class EventDraft {
+  const EventDraft({
+    required this.clubId,
+    this.eventId,
+    this.title = '',
+    this.description = '',
+    this.startsAt,
+    this.endsAt,
+    this.meetingName = '',
+    this.meetingLat,
+    this.meetingLng,
+    this.routeItemId,
+    this.quota = '',
+    this.needsApproval = false,
+  });
 
-  final ComposeDraft draft;
-  final LngLat? picked; // set by the map tap
+  final String clubId;
+  final String? eventId; // editing
+  final String title;
+  final String description;
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+  final String meetingName;
+  final double? meetingLat;
+  final double? meetingLng;
+  final String? routeItemId;
+  final String quota; // as typed
+  final bool needsApproval;
+
+  EventDraft at(double lng, double lat) => EventDraft(
+    clubId: clubId,
+    eventId: eventId,
+    title: title,
+    description: description,
+    startsAt: startsAt,
+    endsAt: endsAt,
+    meetingName: meetingName,
+    meetingLat: double.parse(lat.toStringAsFixed(6)),
+    meetingLng: double.parse(lng.toStringAsFixed(6)),
+    routeItemId: routeItemId,
+    quota: quota,
+    needsApproval: needsApproval,
+  );
 }
 
-/// While non-null and not picked yet, the next map tap sets the post's location
+/// A form waiting for a point picked on the map: a post's location or an event's meeting point
+class CommunityPick {
+  const CommunityPick(this.draft, [this.picked, this.event]);
+
+  final ComposeDraft? draft;
+  final LngLat? picked; // set by the map tap
+  final EventDraft? event;
+}
+
+/// While non-null and not picked yet, the next map tap sets the point
 class CommunityPicking extends Notifier<CommunityPick?> {
   @override
   CommunityPick? build() => null;
 
   void start(ComposeDraft draft) => state = CommunityPick(draft);
+  void startEvent(EventDraft event) => state = CommunityPick(null, null, event);
   void set(double lng, double lat) {
     final s = state;
-    if (s != null && s.picked == null) state = CommunityPick(s.draft, (lng, lat));
+    if (s != null && s.picked == null) state = CommunityPick(s.draft, (lng, lat), s.event);
   }
 
   void cancel() => state = null;

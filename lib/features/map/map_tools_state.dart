@@ -120,6 +120,29 @@ class FlyTo extends Notifier<FlyTarget?> {
 
 final flyToProvider = NotifierProvider<FlyTo, FlyTarget?>(FlyTo.new);
 
+/// Tilt and direction of the map, kept with the centre once it settles (a club's saved view)
+class MapTilt extends Notifier<({double pitch, double bearing})> {
+  @override
+  ({double pitch, double bearing}) build() => (pitch: 0, bearing: 0);
+
+  void set(double pitch, double bearing) => state = (pitch: pitch, bearing: bearing);
+}
+
+final mapTiltProvider = NotifierProvider<MapTilt, ({double pitch, double bearing})>(MapTilt.new);
+
+typedef CameraTarget = ({double lng, double lat, double zoom, double pitch, double bearing});
+
+/// A full camera to fly to (a club's saved view, tilted and turned); the map clears it once there
+class CameraTo extends Notifier<CameraTarget?> {
+  @override
+  CameraTarget? build() => null;
+
+  void go(CameraTarget target) => state = target;
+  void done() => state = null;
+}
+
+final cameraToProvider = NotifierProvider<CameraTo, CameraTarget?>(CameraTo.new);
+
 /// Points the map should fit on screen (an area in focus); the map clears it once there
 class FitPoints extends Notifier<List<(double, double)>?> {
   @override
