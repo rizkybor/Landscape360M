@@ -3,7 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 
-// GPS fixes for the Track Recorder, GPS Tracking and S.O.S, kept coming while the screen is off or another app is in
+// GPS fixes for the Track Recorder, GPS Tracking, S.O.S and Community live sharing, kept coming while the screen is off or another app is in
 // front: on Android a foreground service with a "Recording track" notification, on iOS the
 // background location mode (blue indicator in the status bar). Both start from the app in
 // front, so "While using the app" permission is enough.
@@ -45,6 +45,10 @@ abstract interface class GpsSource {
   /// Fixes until cancelled; errors are [GpsDeniedException], [GpsUnavailableException] or
   /// anything else for "still searching"
   Stream<GpsFix> watch();
+
+  /// Fewer fixes for long sharing (Community events): about one per [sparseDistanceM] moved,
+  /// with the radio resting in between; also in the background
+  Stream<GpsFix> watchSparse();
 
   Future<void> openSettings();
 }
@@ -108,30 +112,69 @@ class GeolocatorGpsSource implements GpsSource {
     return const geo.LocationSettings(accuracy: geo.LocationAccuracy.best, distanceFilter: _distanceFilter);
   }
 
+  /// Community live sharing: a fix about every 25 m, at most every 30 s on Android, which lets
+  /// the GPS rest between fixes (the app keeps one per 2 minutes or 50 m)
+  static const sparseDistanceM = 25;
+
+  geo.LocationSettings get _sparseSettings {
+    if (Platform.isAndroid) {
+      return geo.AndroidSettings(
+        accuracy: geo.LocationAccuracy.high,
+        distanceFilter: sparseDistanceM,
+        intervalDuration: const Duration(seconds: 30),
+        foregroundNotificationConfig: const geo.ForegroundNotificationConfig(
+          notificationTitle: 'Landscape 360 is using GPS',
+          notificationText: 'Sharing your position with your club for an event. Open the app to stop.',
+          notificationChannelName: 'GPS in the background',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+    if (Platform.isIOS) {
+      return geo.AppleSettings(
+        accuracy: geo.LocationAccuracy.high,
+        activityType: geo.ActivityType.fitness,
+        distanceFilter: sparseDistanceM,
+        pauseLocationUpdatesAutomatically: false,
+        allowBackgroundLocationUpdates: true,
+        showBackgroundLocationIndicator: true,
+      );
+    }
+    return const geo.LocationSettings(accuracy: geo.LocationAccuracy.high, distanceFilter: sparseDistanceM);
+  }
+
+  @override
+  Stream<GpsFix> watchSparse() {
+    if (Platform.isAndroid) _notifications.invokeMethod<void>('request').ignore();
+    return _positions(_sparseSettings);
+  }
+
   static const _notifications = MethodChannel('l360/notifications');
 
   @override
   Stream<GpsFix> watch() {
     // Android 13+ asks once for notifications, so the GPS notification shows (MainActivity.kt)
     if (Platform.isAndroid) _notifications.invokeMethod<void>('request').ignore();
-    return _positions();
+    return _positions(_settings);
   }
 
-  Stream<GpsFix> _positions() => geo.Geolocator.getPositionStream(locationSettings: _settings)
-      .map(
-        (p) => GpsFix(
-          lat: p.latitude,
-          lng: p.longitude,
-          // Without a vertical fix the platforms report 0 with no accuracy
-          alt: p.altitude == 0 && p.altitudeAccuracy <= 0 ? null : p.altitude,
-          accuracy: p.accuracy,
-          speed: p.speed < 0 ? null : p.speed,
-          timestamp: p.timestamp.millisecondsSinceEpoch,
-        ),
-      )
-      .handleError((Object e) {
-        if (e is geo.PermissionDeniedException) throw const GpsDeniedException();
-        if (e is geo.LocationServiceDisabledException) throw const GpsUnavailableException();
-        throw e;
-      });
+  Stream<GpsFix> _positions(geo.LocationSettings settings) =>
+      geo.Geolocator.getPositionStream(locationSettings: settings)
+          .map(
+            (p) => GpsFix(
+              lat: p.latitude,
+              lng: p.longitude,
+              // Without a vertical fix the platforms report 0 with no accuracy
+              alt: p.altitude == 0 && p.altitudeAccuracy <= 0 ? null : p.altitude,
+              accuracy: p.accuracy,
+              speed: p.speed < 0 ? null : p.speed,
+              timestamp: p.timestamp.millisecondsSinceEpoch,
+            ),
+          )
+          .handleError((Object e) {
+            if (e is geo.PermissionDeniedException) throw const GpsDeniedException();
+            if (e is geo.LocationServiceDisabledException) throw const GpsUnavailableException();
+            throw e;
+          });
 }

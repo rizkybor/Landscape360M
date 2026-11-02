@@ -7,10 +7,12 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/widgets.dart';
 import '../../data/account/account_repository.dart';
+import '../../data/community/community_events_repository.dart' show liveSessionKey;
 import '../../data/community/community_repository.dart' show feedCacheKey;
 import '../../domain/sos/sos.dart' show emergencyContactsKey;
 import '../../domain/sos/sos_outbox.dart' show sosOutboxKey;
 import '../basemaps/basemap_state.dart';
+import '../community/community_live_state.dart';
 import '../community/community_state.dart';
 import '../live/live_tracking_state.dart';
 import '../sos/sos_state.dart';
@@ -45,6 +47,8 @@ Future<void> deleteAccountData(ProviderReader read, String userId, List<String> 
     await outbox.discard(item.clientId);
   }
   await read(communityPrefsProvider).remove(feedCacheKey);
+  await read(communityLiveProvider.notifier).stop();
+  await read(communityPrefsProvider).remove(liveSessionKey);
 }
 
 /// Step 1: what deleting means. Busy features (a recording, S.O.S) must end first.

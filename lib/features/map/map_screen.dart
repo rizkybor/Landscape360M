@@ -30,9 +30,14 @@ import '../basemaps/basemap_state.dart';
 import '../classic/classic_overlay.dart';
 import '../classic/classic_panel.dart';
 import '../classic/classic_state.dart';
+import '../community/club_map_layer.dart';
+import '../community/club_map_state.dart';
+import '../community/club_map_ui.dart';
 import '../community/community_club_page.dart' show openJoinClub;
 import '../community/community_compose.dart';
+import '../community/community_events_ui.dart' show openEventForm;
 import '../community/community_layer.dart';
+import '../community/community_live_state.dart';
 import '../community/community_post_page.dart';
 import '../community/community_state.dart';
 import '../live/live_tracking_sheet.dart';
@@ -286,7 +291,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ..listen(areasProvider.select((s) => s.panelOpen || s.drawing), lowerSheet)
       ..listen(offlineProvider.select((s) => s.framing), lowerSheet)
       ..listen(classicProvider.select((s) => s.panelOpen), lowerSheet)
-      ..listen(communityPickProvider.select((s) => s != null && s.picked == null), lowerSheet);
+      ..listen(communityPickProvider.select((s) => s != null && s.picked == null), lowerSheet)
+      ..listen(clubDrawProvider.select((d) => d != null), lowerSheet)
+      // A club drawing or saved view shown on the map: the sheet goes down so it is seen
+      ..listen(clubMapProvider.select((s) => s.selectedId != null), lowerSheet)
+      ..listen(cameraToProvider.select((t) => t != null), lowerSheet);
+    // A club drawing's points are done: its label, note and colour
+    ref.listen<ClubDraw?>(clubDrawDoneProvider, (_, d) {
+      if (d == null) return;
+      ref.read(clubDrawDoneProvider.notifier).set(null);
+      unawaited(
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).push(MaterialPageRoute<void>(builder: (_) => AnnotationFormPage(draw: d))),
+      );
+    });
     final routeOpen = ref.watch(routePlannerProvider.select((s) => s.enabled));
     final navigatorOpen = ref.watch(navigatorProvider.select((s) => s.enabled));
     final trackOpen = ref.watch(trackRecorderProvider.select((s) => s.panelOpen));
@@ -309,12 +329,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final markedOpen = ref.watch(markedProvider.select((s) => s.selectedId != null));
     final communityPicking = ref.watch(communityPickProvider.select((s) => s != null && s.picked == null));
     final communityFocus = ref.watch(communityFocusProvider) != null;
+    final communityLive = ref.watch(communityLiveProvider.select((s) => s.on || s.endedMessage != null));
+    final communityLiveMap = ref.watch(communityLiveViewProvider) != null;
+    final clubDrawing = ref.watch(clubDrawProvider.select((d) => d != null));
+    final clubMapShown = ref.watch(clubMapProvider.select((s) => s.shown));
     // The location picked on the map goes back into the post being written
     ref.listen<CommunityPick?>(communityPickProvider, (_, pick) {
       final at = pick?.picked;
       if (pick == null || at == null) return;
       ref.read(communityPickProvider.notifier).cancel();
-      unawaited(openCompose(context, draft: pick.draft.at(at.$1, at.$2)));
+      final draft = pick.draft, event = pick.event;
+      if (draft != null) unawaited(openCompose(context, draft: draft.at(at.$1, at.$2)));
+      if (event != null) unawaited(openEventForm(context, event.at(at.$1, at.$2)));
     });
     // A post opened from its link (/community/<id>)
     ref.listen<String?>(communityOpenProvider, (_, id) {
@@ -328,6 +354,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref.read(communityJoinProvider.notifier).done();
       unawaited(openJoinClub(context, token));
     });
+    // Event live sharing goes on (and restarts after the app was closed) whatever is on screen
+    ref.listen(communityLiveProvider, (_, _) {});
     // Sends trail reports written without signal once it is back
     ref.listen(communityOutboxProvider, (_, _) {});
     // A position picked on the map goes back into the form that asked for it
@@ -402,6 +430,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         if (poiOpen) ...[const PoiCard(), const SizedBox(height: 10)],
                         if (picking) ...[const PickingBar(), const SizedBox(height: 10)],
                         if (communityPicking) ...[const CommunityPickingBar(), const SizedBox(height: 10)],
+                        if (communityLive) ...[const CommunityLiveBanner(), const SizedBox(height: 10)],
+                        if (communityLiveMap) ...[const CommunityLiveMapCard(), const SizedBox(height: 10)],
+                        if (clubDrawing) ...[const ClubDrawingBar(), const SizedBox(height: 10)],
+                        if (clubMapShown && !clubDrawing) ...[
+                          ClubMapCard(onOpen: (a) => openAnnotation(context, ref, a)),
+                          const SizedBox(height: 10),
+                        ],
                         if (communityFocus && !communityPicking) ...[
                           const CommunityFocusCard(),
                           const SizedBox(height: 10),
@@ -492,6 +527,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   BasemapLayer? _basemapLayer;
   SharedLinkLayer? _linkLayer;
   CommunityLayer? _communityLayer;
+  ClubMapLayer? _clubMapLayer;
   late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
   final _cameraTick = ValueNotifier<int>(0);
@@ -625,6 +661,12 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
 
   /// A tap for the open drawing tool; false when none is open
   bool _toolTap(double lng, double lat) {
+    // Drawing on a club's map: the tap is a point of it
+    if (ref.read(clubDrawProvider) != null) {
+      HapticFeedback.lightImpact();
+      ref.read(clubDrawProvider.notifier).tap((lng, lat));
+      return true;
+    }
     // Community, Pick on map: this tap sets where the post is
     final pick = ref.read(communityPickProvider);
     if (pick != null && pick.picked == null) {
@@ -752,6 +794,31 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       }),
       interactionID: 'community-tap',
     );
+    // A participant on an event's live map: their trail
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: communityLiveLayer), (feature, context) {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        HapticFeedback.selectionClick();
+        unawaited(ref.read(communityLiveViewProvider.notifier).showTrail('${feature.properties['id']}'));
+      }),
+      interactionID: 'community-live-tap',
+    );
+    // A drawing on a club's map: selected, and its page opens
+    for (final layerId in [clubMapPointLayer, clubMapLineLayer, clubMapFillLayer]) {
+      map.addInteraction(
+        TapInteraction(FeaturesetDescriptor(layerId: layerId), (feature, context) {
+          final c = context.point.coordinates;
+          if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+          final id = '${feature.properties['id']}';
+          final a = ref.read(clubMapProvider).annotations.where((x) => x.id == id).firstOrNull;
+          if (a == null || !mounted) return;
+          HapticFeedback.selectionClick();
+          unawaited(openAnnotation(this.context, ref, a));
+        }),
+        interactionID: 'club-map-tap-$layerId',
+      );
+    }
     map.addInteraction(
       TapInteraction(FeaturesetDescriptor(layerId: communityClustersLayer), (feature, context) async {
         final c = context.point.coordinates;
@@ -819,6 +886,10 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       final community = _communityLayer ??= CommunityLayer(map, scale);
       await community.install();
       await community.show(ref.read(communityLayerProvider), ref.read(communityFocusProvider));
+      await community.showLive(ref.read(communityLiveViewProvider), DateTime.now());
+      final clubMap = _clubMapLayer ??= ClubMapLayer(map);
+      await clubMap.install();
+      await clubMap.show(ref.read(clubMapProvider), ref.read(clubDrawProvider));
       final link = _linkLayer ??= SharedLinkLayer(map);
       await link.install();
       await link.show(ref.read(sharedLinkProvider));
@@ -964,6 +1035,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     if (!mounted) return;
     ref.read(mapCenterProvider.notifier).set(lng, lat);
     ref.read(mapZoomProvider.notifier).set(c.zoom);
+    ref.read(mapTiltProvider.notifier).set(c.pitch, c.bearing);
     _telemetry.value = Telemetry(
       lng: lng,
       lat: lat,
@@ -1159,6 +1231,36 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
         unawaited(ref.read(communityLayerProvider.notifier).refresh(b));
       }
     });
+    ref
+      ..listen<ClubMapState>(
+        clubMapProvider,
+        (_, next) => unawaited(_clubMapLayer?.show(next, ref.read(clubDrawProvider))),
+      )
+      ..listen<ClubDraw?>(
+        clubDrawProvider,
+        (_, next) => unawaited(_clubMapLayer?.show(ref.read(clubMapProvider), next)),
+      );
+    // A club's saved view: there, tilted and turned as it was saved
+    ref.listen<CameraTarget?>(cameraToProvider, (_, t) {
+      final map = _map;
+      if (t == null || map == null) return;
+      ref.read(cameraToProvider.notifier).done();
+      unawaited(
+        map.flyTo(
+          CameraOptions(
+            center: Point(coordinates: Position(t.lng, t.lat)),
+            zoom: t.zoom,
+            pitch: t.pitch,
+            bearing: t.bearing,
+          ),
+          MapAnimationOptions(duration: 1500),
+        ),
+      );
+    });
+    ref.listen<LiveViewState?>(
+      communityLiveViewProvider,
+      (_, next) => unawaited(_communityLayer?.showLive(next, DateTime.now())),
+    );
     ref.listen<MapFocus?>(
       communityFocusProvider,
       (_, next) => unawaited(_communityLayer?.show(ref.read(communityLayerProvider), next)),

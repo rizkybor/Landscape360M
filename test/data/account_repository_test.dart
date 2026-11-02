@@ -218,7 +218,10 @@ void main() {
       // Ran out, before the server's daily clean-up turned it to Free
       backend
         ..profileError = null
-        ..row = {'status_subscribe': 'Pro', 'subscription_expires_at': DateTime.now().subtract(const Duration(hours: 1)).toUtc().toIso8601String()};
+        ..row = {
+          'status_subscribe': 'Pro',
+          'subscription_expires_at': DateTime.now().subtract(const Duration(hours: 1)).toUtc().toIso8601String(),
+        };
       final ended = (await repo().loadProfile())!;
       expect((ended.plan, ended.subscriptionExpiresAt, ended.canRenameCloudTracks), (Plan.free, null, false));
     });
