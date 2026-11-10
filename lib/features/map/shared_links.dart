@@ -19,6 +19,7 @@ import '../../domain/util/js_compat.dart';
 import '../areas/area_state.dart' show areaBackendProvider;
 import '../classic/classic_state.dart';
 import '../community/community_state.dart';
+import '../friends/friends_state.dart' show friendLinkProvider;
 import '../marked/marked_icons.dart';
 import 'map_tools_state.dart';
 import 'style_guard.dart';
@@ -156,6 +157,9 @@ class SharedLinkController extends Notifier<SharedView?> {
       case JoinLink(:final token):
         // The map screen opens the club's invite card
         ref.read(communityJoinProvider.notifier).open(token);
+      case FriendLink(:final token):
+        // The map screen opens the friend's card
+        ref.read(friendLinkProvider.notifier).open(token);
       case AreaLink(:final token):
         state = const SharedArea(LinkStatus.loading);
         try {

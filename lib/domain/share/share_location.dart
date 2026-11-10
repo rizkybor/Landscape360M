@@ -1,3 +1,4 @@
+import '../friends/friends.dart' show parseFriendParam;
 import '../survey/survey_utils.dart';
 import '../util/js_compat.dart';
 
@@ -147,6 +148,8 @@ sealed class IncomingLink {
     final search = uri.query;
     final join = parseJoinParam(search);
     if (join != null) return JoinLink(join);
+    final friend = parseFriendParam(search);
+    if (friend != null) return FriendLink(friend);
     final classic = parseClassicToken(search);
     if (classic != null) return ClassicLink(classic);
     final area = parseAreaToken(search);
@@ -171,6 +174,12 @@ class PlaceLink extends IncomingLink {
 
 class ClassicLink extends IncomingLink {
   const ClassicLink(this.token);
+  final String token;
+}
+
+/// A friend link or QR (`/?friend=<token>`): who it is, and Add friend
+class FriendLink extends IncomingLink {
+  const FriendLink(this.token);
   final String token;
 }
 

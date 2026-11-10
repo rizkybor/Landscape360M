@@ -12,6 +12,8 @@ import '../../domain/account/profile.dart';
 import '../community/community_club_page.dart' show openClub;
 import '../community/community_clubs.dart' show ClubAvatar;
 import '../community/community_state.dart' show myClubsProvider;
+import '../friends/friends_page.dart' show openFriends;
+import '../friends/friends_state.dart' show friendsUnreadProvider;
 import '../offline/offline_state.dart' show offlineSheetRequestProvider;
 import '../sos/sos_alerts.dart';
 import '../sos/sos_screen.dart';
@@ -132,6 +134,7 @@ class _AccountBody extends ConsumerWidget {
                 const SizedBox(height: 16),
                 const _StorageCard(),
                 const SizedBox(height: 24),
+                const _FriendsTile(),
                 const _ClubsSection(),
                 GroupedSection(
                   title: 'Settings',
@@ -244,6 +247,45 @@ class _AccountBody extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Friends & chat, with the count of unread messages and friend requests
+class _FriendsTile extends ConsumerWidget {
+  const _FriendsTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final u = ref.watch(friendsUnreadProvider);
+    final n = u.messages + u.requests;
+    return GroupedSection(
+      children: [
+        ListTile(
+          key: const Key('account-friends'),
+          leading: const TileIcon(Icons.people_alt_outlined),
+          title: const Text('Friends'),
+          subtitle: Text(
+            [
+              if (u.messages > 0) '${u.messages} new message${u.messages == 1 ? '' : 's'}',
+              if (u.requests > 0) '${u.requests} friend request${u.requests == 1 ? '' : 's'}',
+            ].join(' · ').ifEmpty('Chat, share your location and map data'),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (n > 0) Badge(backgroundColor: L360Colors.ember500, label: Text(n > 99 ? '99+' : '$n')),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right, color: L360Colors.sand400),
+            ],
+          ),
+          onTap: () => openFriends(context),
+        ),
+      ],
+    );
+  }
+}
+
+extension on String {
+  String ifEmpty(String other) => isEmpty ? other : this;
 }
 
 /// The Community clubs the account belongs to, with its role in each; tap one to open it.

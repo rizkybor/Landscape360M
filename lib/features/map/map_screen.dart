@@ -40,6 +40,8 @@ import '../community/community_layer.dart';
 import '../community/community_live_state.dart';
 import '../community/community_post_page.dart';
 import '../community/community_state.dart';
+import '../friends/friends_page.dart' show openFriendLink;
+import '../friends/friends_state.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
 import '../marked/marked_layer.dart';
@@ -109,6 +111,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   DateTime _profileReadAt = DateTime.now();
 
   void _onResume() {
+    // New messages and friend requests: the badge
+    unawaited(ref.read(friendsUnreadProvider.notifier).refresh());
     final now = DateTime.now();
     if (now.difference(_profileReadAt) < const Duration(minutes: 2)) return;
     _profileReadAt = now;
@@ -349,6 +353,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       unawaited(openCommunityPost(context, id));
     });
     // A club invite link (/?join=<token>)
+    ref.listen<String?>(friendLinkProvider, (_, token) {
+      if (token == null) return;
+      ref.read(friendLinkProvider.notifier).done();
+      unawaited(openFriendLink(context, token));
+    });
+    // Chat messages written without signal go once it is back
+    ref.listen(chatOutboxProvider, (_, _) {});
     ref.listen<String?>(communityJoinProvider, (_, token) {
       if (token == null) return;
       ref.read(communityJoinProvider.notifier).done();
