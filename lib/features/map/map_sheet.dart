@@ -22,6 +22,7 @@ import '../basemaps/basemap_state.dart';
 import '../classic/classic_state.dart';
 import '../community/community_sheet.dart';
 import '../community/community_state.dart';
+import '../friends/friends_state.dart' show friendsUnreadProvider;
 import '../guide/quick_guide.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
@@ -330,12 +331,25 @@ class _AccountButton extends StatelessWidget {
       onPressed: () => context.push(p == null ? '/login' : '/account'),
       icon: p == null
           ? const Icon(Icons.account_circle_outlined)
-          : CircleAvatar(
-              radius: 14,
-              backgroundColor: L360Colors.forest700,
-              child: Text(
-                name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+          : Consumer(
+              builder: (context, ref, avatar) {
+                // New messages or friend requests
+                final u = ref.watch(friendsUnreadProvider);
+                return Badge(
+                  key: const Key('account-badge'),
+                  isLabelVisible: u.messages + u.requests > 0,
+                  backgroundColor: L360Colors.ember500,
+                  label: Text('${u.messages + u.requests > 99 ? '99+' : u.messages + u.requests}'),
+                  child: avatar,
+                );
+              },
+              child: CircleAvatar(
+                radius: 14,
+                backgroundColor: L360Colors.forest700,
+                child: Text(
+                  name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
     );

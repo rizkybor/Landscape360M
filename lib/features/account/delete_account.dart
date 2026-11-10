@@ -14,6 +14,7 @@ import '../../domain/sos/sos_outbox.dart' show sosOutboxKey;
 import '../basemaps/basemap_state.dart';
 import '../community/community_live_state.dart';
 import '../community/community_state.dart';
+import '../friends/friends_state.dart' show chatOutboxKey, friendsCacheKey;
 import '../live/live_tracking_state.dart';
 import '../sos/sos_state.dart';
 import '../tracks/track_recorder_state.dart';
@@ -49,6 +50,13 @@ Future<void> deleteAccountData(ProviderReader read, String userId, List<String> 
   await read(communityPrefsProvider).remove(feedCacheKey);
   await read(communityLiveProvider.notifier).stop();
   await read(communityPrefsProvider).remove(liveSessionKey);
+  // Friends & chat: the lists and chats kept offline and the messages still waiting
+  final prefs2 = read(communityPrefsProvider);
+  for (final key in await prefs2.getKeys()) {
+    if (key == friendsCacheKey(userId) || key == chatOutboxKey(userId) || key.startsWith('l360-chat-$userId-')) {
+      await prefs2.remove(key);
+    }
+  }
 }
 
 /// Step 1: what deleting means. Busy features (a recording, S.O.S) must end first.
