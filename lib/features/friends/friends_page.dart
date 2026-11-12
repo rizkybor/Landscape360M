@@ -14,9 +14,10 @@ import '../../domain/friends/friends.dart';
 import '../community/community_widgets.dart' show EmptyState, confirmDialog;
 import 'chat_page.dart';
 import 'friends_state.dart';
+import 'group_sheets.dart';
 
-// Friends (User Account → Friends): Chats, the most recent first, and Friends with the requests
-// to answer; Add friend by email, by scanning a friend's QR, or by sharing my own QR / link; and
+// Friends (User Account → Friends): Chats (friends and groups), the most recent first, and
+// Friends with the requests to answer and my groups; Add friend by email, by scanning a friend's QR, or by sharing my own QR / link; and
 // the card a friend link (/?friend=) opens.
 
 String _message(Object e) => e is CommunityException ? e.message : '$e';
@@ -344,9 +345,9 @@ class _ChatsTab extends ConsumerWidget {
                 ),
               ),
             ),
-            for (final (i, f) in chats.indexed) ...[
+            for (final (i, e) in chats.indexed) ...[
               if (i > 0) const Divider(height: 1, indent: 54, color: L360Colors.sand200),
-              _ChatRow(friend: f, now: now),
+              _ChatRow(entry: e, now: now),
             ],
           ],
         ],
@@ -355,16 +356,18 @@ class _ChatsTab extends ConsumerWidget {
   }
 }
 
-/// One chat: avatar, name, the last message (an icon for a location or map data), when, unread
+/// One chat (a friend or a group): avatar, name, the last message (an icon for a location or map
+/// data), when, unread
 class _ChatRow extends StatelessWidget {
-  const _ChatRow({required this.friend, required this.now});
+  const _ChatRow({required this.entry, required this.now});
 
-  final Friend friend;
+  final ChatEntry entry;
   final DateTime now;
 
   @override
   Widget build(BuildContext context) {
-    final f = friend;
+    final f = entry;
+    final g = entry.group;
     final unread = f.unread > 0;
     final icon = f.lastDeleted
         ? Icons.block
@@ -375,13 +378,13 @@ class _ChatRow extends StatelessWidget {
           };
     final preview = (f.preview ?? '').replaceFirst(RegExp(r'^You: '), '');
     return InkWell(
-      key: Key('chat-${f.userId}'),
-      onTap: () => openChat(context, f.userId, f.name),
+      key: Key('chat-${f.ref.id}'),
+      onTap: () => g == null ? openChat(context, f.ref.id, f.name) : openGroupChat(context, g.id, g.name),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
         child: Row(
           children: [
-            FriendAvatar(name: f.name, size: 38),
+            if (g != null) GroupAvatar(isClub: g.isClub, size: 38) else FriendAvatar(name: f.name, size: 38),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -402,14 +405,15 @@ class _ChatRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        chatTime(f.lastAt!, now),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
-                          color: unread ? L360Colors.ember600 : L360Colors.sand500,
+                      if (f.lastAt != null)
+                        Text(
+                          chatTime(f.lastAt!, now),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+                            color: unread ? L360Colors.ember600 : L360Colors.sand500,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -426,7 +430,9 @@ class _ChatRow extends StatelessWidget {
                       ],
                       Expanded(
                         child: Text(
-                          preview,
+                          g != null && f.lastAt == null
+                              ? '${g.memberCount} member${g.memberCount == 1 ? '' : 's'}'
+                              : preview,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -553,6 +559,45 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
                 ),
               ),
           ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(L360.gutter, 16, 8, 4),
+            child: Row(
+              children: [
+                Expanded(child: Text('GROUPS · ${s.groups.length}', style: label)),
+                TextButton.icon(
+                  key: const Key('group-create'),
+                  onPressed: () => showCreateGroup(context),
+                  icon: const Icon(Icons.group_add_outlined, size: 18),
+                  label: const Text('New group'),
+                ),
+              ],
+            ),
+          ),
+          if (s.groups.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: L360.gutter, vertical: 4),
+              child: Text(
+                'A group of your friends (Pro and up), or your club\'s chat once its leader opens it.',
+                style: TextStyle(color: L360Colors.sand600),
+              ),
+            ),
+          for (final g in s.groups)
+            ListTile(
+              key: Key('group-${g.id}'),
+              leading: GroupAvatar(isClub: g.isClub),
+              title: Text(g.name),
+              subtitle: Text(
+                '${g.isClub ? 'Club chat' : 'Group'} · ${g.memberCount} member${g.memberCount == 1 ? '' : 's'}'
+                '${g.isManager ? (g.isClub ? ' · you lead it' : ' · you made it') : ''}',
+              ),
+              onTap: () => openGroupChat(context, g.id, g.name),
+              trailing: IconButton(
+                key: Key('group-members-${g.id}'),
+                tooltip: 'Members',
+                icon: const Icon(Icons.people_outline, color: L360Colors.sand600),
+                onPressed: () => showGroupMembers(context, g.id),
+              ),
+            ),
           header('Friends · ${s.friends.length}'),
           if (s.friends.isEmpty)
             Padding(

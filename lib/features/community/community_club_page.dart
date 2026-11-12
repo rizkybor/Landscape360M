@@ -13,6 +13,8 @@ import '../../domain/community/community_attachments.dart';
 import '../../domain/marked/marked_areas.dart' show formatLength;
 import '../../domain/share/share_location.dart' show ClassicLink;
 import '../account/sign_in_sheet.dart';
+import '../friends/chat_page.dart' show openGroupChat;
+import '../friends/friends_state.dart' show clubChatProvider, friendsProvider;
 import '../map/shared_links.dart';
 import 'club_map_ui.dart' show ClubMapTab;
 import 'community_attach.dart';
@@ -191,12 +193,51 @@ class _ClubPageState extends ConsumerState<ClubPage> {
         label: Text(club.newPosts > 0 ? 'Club posts (${club.newPosts} new)' : 'Club posts'),
       ),
       const SizedBox(height: 6),
+      _ClubChatButton(club: club),
+      const SizedBox(height: 6),
       const Text(
         'Posts to this club are $membersOnlyLabel: only its members see them, and they have no public link.',
         style: TextStyle(fontSize: 12, color: L360Colors.sand600),
       ),
     ],
   );
+}
+
+/// The club's chat: members open it once the leader has made it; the leader makes it here
+class _ClubChatButton extends ConsumerWidget {
+  const _ClubChatButton({required this.club});
+
+  final CommunityClub club;
+
+  Future<void> _open(BuildContext context, WidgetRef ref, String? groupId) async {
+    try {
+      final id = groupId ?? await ref.read(friendsProvider.notifier).openClubChat(club.id);
+      if (!context.mounted) return;
+      ref.invalidate(clubChatProvider(club.id));
+      await openGroupChat(context, id, club.name);
+    } on Object catch (e) {
+      if (context.mounted) showSnack(context, '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chat = ref.watch(clubChatProvider(club.id));
+    final id = chat.value;
+    if (id == null && !club.isOwner) {
+      return Text(
+        chat.isLoading ? 'Looking for the club chat…' : 'The club leader has not opened a club chat yet.',
+        key: const Key('club-chat-none'),
+        style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
+      );
+    }
+    return OutlinedButton.icon(
+      key: const Key('club-chat'),
+      onPressed: chat.isLoading ? null : () => _open(context, ref, id),
+      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+      label: Text(id == null ? 'Open a club chat' : 'Club chat'),
+    );
+  }
 }
 
 // --- Members -------------------------------------------------------------------------------------

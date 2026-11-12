@@ -1,6 +1,6 @@
 // Friends & Chat on a simulator, with the server in memory (nothing reaches real accounts): the
-// chat list, a chat with text, a location and a track, My QR, and a friend link's card. Prints
-// "SHOT:<name>" at each scene.
+// chat list, a chat with text, a location and a track, a group chat with a reply, My QR, and a
+// friend link's card. Prints "SHOT:<name>" at each scene.
 //   flutter test integration_test/friends_flow_test.dart -d <simulator> --dart-define-from-file=config/dev.json
 import 'dart:typed_data';
 
@@ -19,6 +19,7 @@ import 'package:landscape360/features/friends/friends_page.dart';
 
 const _budi = 'bbbbbbbb-0000-4000-8000-00000000000b';
 const _token = '0123456789abcdef0123456789abcdef';
+const _group = '22222222-0000-4000-8000-000000000002';
 
 String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
 
@@ -115,6 +116,88 @@ class _Server implements CommunityBackend {
                 'updated_at': _ago(const Duration(minutes: 30)),
               },
             ],
+    'my_chat_groups' => [
+      {
+        'id': _group,
+        'kind': 'club',
+        'club_id': 'club1',
+        'name': 'SAR Magelang',
+        'is_manager': false,
+        'member_count': 12,
+        'created_at': _ago(const Duration(days: 20)),
+        'last_at': _ago(const Duration(minutes: 1)),
+        'last_kind': 'text',
+        'last_body': 'Oke, saya bawa tali 50 m',
+        'last_from_me': false,
+        'last_sender': 'Eka N.',
+        'last_deleted': false,
+        'unread': 3,
+      },
+    ],
+    'group_messages' =>
+      p['p_since'] != null
+          ? <Object>[]
+          : [
+              {
+                'id': 'g4',
+                'from_me': false,
+                'sender_id': 'e',
+                'sender_name': 'Eka N.',
+                'kind': 'text',
+                'body': 'Oke, saya bawa tali 50 m',
+                'reply_to': 'g2',
+                'reply_from_me': true,
+                'reply_name': 'Rina W.',
+                'reply_kind': 'text',
+                'reply_body': 'Siapa yang bawa tali?',
+                'created_at': _ago(const Duration(minutes: 1)),
+                'deleted': false,
+                'updated_at': _ago(const Duration(minutes: 1)),
+              },
+              {
+                'id': 'g3',
+                'from_me': false,
+                'sender_id': 'c',
+                'sender_name': 'Citra P.',
+                'kind': 'location',
+                'data': {'lat': -7.4701, 'lng': 110.2175, 'accuracy': 8, 'elevation': 1240},
+                'created_at': _ago(const Duration(minutes: 6)),
+                'deleted': false,
+                'updated_at': _ago(const Duration(minutes: 6)),
+              },
+              {
+                'id': 'g2',
+                'from_me': true,
+                'kind': 'text',
+                'body': 'Siapa yang bawa tali?',
+                'created_at': _ago(const Duration(minutes: 12)),
+                'deleted': false,
+                'updated_at': _ago(const Duration(minutes: 12)),
+              },
+              {
+                'id': 'g1',
+                'from_me': false,
+                'sender_id': 'c',
+                'sender_name': 'Citra P.',
+                'kind': 'text',
+                'body': 'Briefing jam 7 di posko, bawa perlengkapan lengkap ya',
+                'created_at': _ago(const Duration(minutes: 15)),
+                'deleted': false,
+                'updated_at': _ago(const Duration(minutes: 15)),
+              },
+            ],
+    'chat_group_members' => [
+      {
+        'user_id': 'c',
+        'name': 'Citra P.',
+        'organization': 'SAR Magelang',
+        'is_manager': true,
+        'since': _ago(const Duration(days: 20)),
+      },
+      {'user_id': 'a', 'name': 'Rina W.', 'is_me': true, 'since': _ago(const Duration(days: 19))},
+      {'user_id': 'e', 'name': 'Eka N.', 'organization': 'SAR Magelang', 'since': _ago(const Duration(days: 18))},
+    ],
+    'mark_group_read' => null,
     'my_friend_link' => _token,
     'friend_link_info' => [
       {'name': 'Fajar K.', 'organization': 'Mapala UI', 'is_me': false},
@@ -192,6 +275,25 @@ void main() {
     expect(find.byType(ChatPage), findsOneWidget);
     expect(find.text('Merbabu via Selo'), findsOneWidget);
     await shot(tester, 'friends3_chat');
+    nav.currentState!.pop();
+    await wait(tester, 800);
+
+    await tester.tap(find.byKey(const Key('chat-$_group')));
+    await wait(tester, 1500);
+    expect(find.text('Eka N.'), findsWidgets);
+    await shot(tester, 'friends6_group');
+    await tester.longPress(find.byKey(const Key('message-g1')));
+    await wait(tester, 600);
+    await tester.tap(find.byKey(const Key('chat-reply')));
+    await wait(tester, 600);
+    await tester.enterText(find.byKey(const Key('chat-input')), 'Siap, saya bawa P3K');
+    await wait(tester, 400);
+    await shot(tester, 'friends7_reply');
+    await tester.tap(find.byKey(const Key('chat-members')));
+    await wait(tester, 1200);
+    await shot(tester, 'friends8_members');
+    nav.currentState!.pop();
+    await wait(tester, 400);
     nav.currentState!.pop();
     await wait(tester, 800);
 
