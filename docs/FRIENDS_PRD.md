@@ -1,6 +1,6 @@
 # PRD: Friends & Chat (Landscape 360)
 
-Status: **dibangun** (aplikasi; web dan database diserahkan di `docs/backend/friends/`) · 11 November 2026
+Status: **dibangun** (aplikasi; web dan database diserahkan di `docs/backend/friends/`) · 11 November 2026 · grup, balasan dan web khusus aplikasi: 12 November 2026 (bagian 15)
 
 ## 1. Ringkasan
 
@@ -210,3 +210,55 @@ Satu pemeriksaan = satu panggilan RPC kecil (`my_chat_updates(since)`) yang hany
 `my_chat_updates` di bagian 9 menjadi dua fungsi: `my_chat_unread()` untuk badge, dan
 `chat_messages(p_with, p_before, p_since)` yang dengan `p_since` hanya mengembalikan pesan yang
 berubah (baru, dibaca, dihapus) untuk chat yang sedang terbuka.
+
+## 15. Grup, balasan, dan chat khusus aplikasi (12 November 2026)
+
+Migration `20261112000033_chat_groups.sql`, di atas migration 0032.
+
+### 15.1 Chat Club
+
+- Dibuka oleh **Ketua Club** (tombol *Open a club chat* di halaman club; perlu akun Enterprise
+  seperti pengelolaan club lainnya). Satu per club; membuka lagi memakai yang sama.
+- Anggotanya **mengikuti keanggotaan club**: tidak ada tambah / hapus anggota; keluar dari club
+  berarti keluar dari chatnya. Anggota club melihat tombol *Club chat* setelah dibuka.
+- Ketua Club bisa menghapus pesan siapa pun kapan saja, dan menghapus chat club (beserta semua
+  pesannya). Hilang bersama club.
+
+### 15.2 Grup baru
+
+- Dibuat oleh akun **Pro ke atas** (Friends → Groups → *New group*): nama 2–60 huruf, lalu pilih
+  teman. Akun Free tidak bisa membuat, tapi bisa menjadi anggota.
+- **Hanya pembuat grup** yang menambah anggota, dan hanya **teman yang sudah saling berteman**
+  dengannya. Pembuat juga mengganti nama, mengeluarkan anggota, menghapus pesan siapa pun, dan
+  menghapus grup. Anggota lain bisa keluar sendiri; pembuat tidak bisa keluar (hapus grupnya).
+- Batas: Pro **10 grup, 50 anggota** per grup; Enterprise 30 / 200; admin tanpa batas.
+
+### 15.3 Pesan grup
+
+- Tabel `chat_messages` yang sama, dengan `group_id` (bukan `recipient_id`). Jenis pesan,
+  batas harian, dan aturan lampiran peta sama dengan chat pribadi.
+- "Dibaca" di grup per anggota (`chat_group_reads.last_read_at`, diperbarui saat grup dibuka),
+  bukan per pesan; tidak ada centang dua di grup. Belum dibaca = pesan orang lain setelah itu.
+- Setiap pesan menampilkan nama pengirim; header membuka daftar anggota.
+
+### 15.4 Balasan (reply)
+
+- Kolom `reply_to` di `chat_messages`; harus pesan dari percakapan yang sama. Berlaku di chat
+  pribadi dan grup, juga saat dikirim dari antrean offline.
+- Pembacaan menyertakan kutipan: siapa, jenis, 120 huruf pertama, atau "Message deleted" bila
+  pesan asal sudah dihapus. Di aplikasi: tekan lama → *Reply*; bar balasan di atas kotak pesan.
+
+### 15.5 Web
+
+Web tetap menampilkan tombol Friends, daftar Chats dengan jumlah belum dibaca, permintaan
+pertemanan, QR dan Add friend. Membuka sebuah chat di web menampilkan pemberitahuan bahwa chat
+(pesan, lokasi, data peta, grup, balasan) **hanya di aplikasi**. Komponen chat di web dihapus.
+
+### 15.6 Fungsi baru
+
+`create_chat_group`, `create_club_chat`, `club_chat_group`, `add_chat_group_members`,
+`remove_chat_group_member`, `rename_chat_group`, `delete_chat_group`, `my_chat_groups`,
+`chat_group_members`, `send_group_message`, `group_messages`, `mark_group_read`.
+Berubah: `send_chat_message` (+ `p_reply_to`), `chat_messages` (+ kolom kutipan),
+`delete_chat_message` (pembuat grup / Ketua Club), `my_chat_unread` (ikut grup),
+`friends_limits` (+ `groups`, `group_members`).

@@ -65,6 +65,32 @@ Map<String, dynamic> messageRow(
   'updated_at': readAt ?? at,
 };
 
+Map<String, dynamic> groupRow({
+  String id = 'g1',
+  String kind = 'group',
+  String name = 'Tim Merbabu',
+  bool manager = false,
+  int members = 3,
+  String? last,
+  String? sender = 'Budi S.',
+  int unread = 0,
+}) => {
+  'id': id,
+  'kind': kind,
+  'club_id': kind == 'club' ? 'club1' : null,
+  'name': name,
+  'is_manager': manager,
+  'member_count': members,
+  'created_at': '2026-11-05T00:00:00Z',
+  'last_at': last == null ? null : '2026-11-10T09:00:00Z',
+  'last_kind': last == null ? null : 'text',
+  'last_body': last,
+  'last_from_me': false,
+  'last_sender': sender,
+  'last_deleted': false,
+  'unread': unread,
+};
+
 void main() {
   late FakeCommunity backend;
   late StreamController<bool> online;
@@ -78,7 +104,9 @@ void main() {
       ..answers['my_chat_unread'] = [
         {'messages': 2, 'requests': 0},
       ]
-      ..answers['chat_messages'] = <Object>[];
+      ..answers['chat_messages'] = <Object>[]
+      ..answers['my_chat_groups'] = <Object>[]
+      ..answers['group_messages'] = <Object>[];
   });
   tearDown(() => online.close());
 
@@ -185,6 +213,49 @@ void main() {
       expect(chatTime(DateTime(2026, 11, 2, 8), now), '2 Nov');
       expect(chatTime(DateTime(2025, 12, 31), now), '31 Dec 2025');
     });
+
+    test('a group row, its preview with the sender, and the chat list with groups in it', () {
+      final g = ChatGroup.fromRow(groupRow(last: 'Kumpul\njam 5', unread: 3));
+      expect(
+        (g.name, g.isClub, g.memberCount, g.unread, g.preview),
+        ('Tim Merbabu', false, 3, 3, 'Budi S.: Kumpul jam 5'),
+      );
+      expect(ChatGroup.fromRow(groupRow(kind: 'club')).isClub, isTrue);
+      expect(ChatGroup.fromRow(groupRow()).preview, isNull, reason: 'nothing said yet');
+      final friend = Friend.fromRow(friendRow(last: 'halo'));
+      final list = chatEntries(
+        [friend, Friend.fromRow(friendRow(id: 'x'))],
+        [g, ChatGroup.fromRow(groupRow(id: 'g0'))],
+      );
+      expect(
+        [for (final e in list) e.name],
+        ['Tim Merbabu', 'Budi S.', 'Tim Merbabu'],
+        reason: 'newest first; no chat yet is left out',
+      );
+      expect(list.first.ref, chatInGroup('g1'));
+      expect(list[1].ref, chatWith(budi));
+    });
+
+    test('a reply carries a quote, kept in the outbox and the cache', () {
+      final row = {
+        ...messageRow('m2', fromMe: true, body: 'Siap'),
+        'reply_to': 'm1',
+        'reply_name': 'Budi S.',
+        'reply_kind': 'text',
+        'reply_body': 'Kumpul jam 5',
+      };
+      final m = ChatMessage.fromRow(row);
+      expect((m.reply!.id, m.reply!.who, m.reply!.text), ('m1', 'Budi S.', 'Kumpul jam 5'));
+      final again = ChatMessage.fromJson(m.toJson());
+      expect(again.reply!.id, 'm1');
+      expect(ChatMessage.fromRow(messageRow('m3')).reply, isNull);
+      final long = ChatMessage.fromRow(messageRow('m4', body: 'x' * 300));
+      expect(ChatReply.of(long).body!.length, 120);
+      final deleted = ChatReply.fromRow({'reply_to': 'm1', 'reply_deleted': true, 'reply_from_me': true});
+      expect((deleted!.who, deleted.text), ('You', 'Message deleted'));
+      final inGroup = ChatMessage.fromRow({...messageRow('m5'), 'sender_id': budi, 'sender_name': 'Budi S.'});
+      expect(inGroup.senderName, 'Budi S.');
+    });
   });
 
   group('state', () {
@@ -216,11 +287,11 @@ void main() {
         {'id': 'm9', 'created_at': '2026-11-10T09:00:00Z'},
       ];
       final c = await container();
-      await c.read(chatProvider(budi).notifier).send(ChatKind.text, body: '  Kumpul jam 5 ');
+      await c.read(chatProvider(chatWith(budi)).notifier).send(ChatKind.text, body: '  Kumpul jam 5 ');
       expect(c.read(chatOutboxProvider), isEmpty);
       final p = backend.params('send_chat_message');
       expect((p['p_to'], p['p_kind'], p['p_body']), (budi, 'text', 'Kumpul jam 5'));
-      expect(c.read(chatProvider(budi)).messages.single.id, 'm9');
+      expect(c.read(chatProvider(chatWith(budi))).messages.single.id, 'm9');
     });
 
     test('without signal it waits on the phone, then goes once, with the same client id', () async {
@@ -231,7 +302,7 @@ void main() {
         ];
       final c = await container();
       await c
-          .read(chatProvider(budi).notifier)
+          .read(chatProvider(chatWith(budi)).notifier)
           .send(ChatKind.location, data: const ChatLocation(lat: -7.45, lng: 110.43).toJson());
       final waiting = c.read(chatOutboxProvider).single;
       expect(waiting.message.state, SendState.queued);
@@ -249,7 +320,7 @@ void main() {
     test('a refusal is kept with its reason; try again or do not send', () async {
       backend.fail['send_chat_message'] = const CommunityException('You can only message your friends');
       final c = await container();
-      await c.read(chatProvider(budi).notifier).send(ChatKind.text, body: 'halo');
+      await c.read(chatProvider(chatWith(budi)).notifier).send(ChatKind.text, body: 'halo');
       final failed = c.read(chatOutboxProvider).single.message;
       expect((failed.state, failed.error), (SendState.failed, 'You can only message your friends'));
       await c.read(chatOutboxProvider.notifier).discard(failed.id);
@@ -259,16 +330,57 @@ void main() {
     test('an open chat reads the page, marks it read, then asks only for changes', () async {
       backend.answers['chat_messages'] = [messageRow('m2', at: '2026-11-10T08:01:00Z'), messageRow('m1')];
       final c = await container();
-      final chat = c.read(chatProvider(budi).notifier);
+      final chat = c.read(chatProvider(chatWith(budi)).notifier);
       await chat.open();
       addTearDown(chat.close);
-      expect([for (final m in c.read(chatProvider(budi)).messages) m.id], ['m2', 'm1']);
+      expect([for (final m in c.read(chatProvider(chatWith(budi))).messages) m.id], ['m2', 'm1']);
       expect(backend.params('mark_chat_read'), {'p_with': budi});
 
       backend.answers['chat_messages'] = [messageRow('m3', at: '2026-11-10T08:02:00Z')];
       await chat.poll();
       expect(backend.params('chat_messages')['p_since'], '2026-11-10T08:01:00.000Z');
-      expect([for (final m in c.read(chatProvider(budi)).messages) m.id], ['m3', 'm2', 'm1']);
+      expect([for (final m in c.read(chatProvider(chatWith(budi))).messages) m.id], ['m3', 'm2', 'm1']);
+    });
+
+    test('a group: made with friends, read with its own functions, a reply sent along', () async {
+      backend
+        ..answers['create_chat_group'] = 'g1'
+        ..answers['add_chat_group_members'] = 2
+        ..answers['my_chat_groups'] = [groupRow(manager: true)]
+        ..answers['group_messages'] = [
+          {...messageRow('m1'), 'sender_id': budi, 'sender_name': 'Budi S.'},
+        ]
+        ..answers['send_group_message'] = [
+          {'id': 'm2', 'created_at': '2026-11-10T09:00:00Z'},
+        ];
+      final c = await container();
+      final id = await c.read(friendsProvider.notifier).createGroup(' Tim Merbabu ', [budi, 'u3']);
+      expect(id, 'g1');
+      expect(backend.params('create_chat_group'), {'p_name': 'Tim Merbabu'});
+      expect(backend.params('add_chat_group_members'), {
+        'p_group': 'g1',
+        'p_user_ids': [budi, 'u3'],
+      });
+      expect(c.read(friendsProvider).groups.single.isManager, isTrue);
+      expect(
+        [for (final e in c.read(friendsProvider).chats) e.name],
+        ['Budi S.', 'Tim Merbabu'],
+        reason: 'listed without a message',
+      );
+
+      final chat = c.read(chatProvider(chatInGroup('g1')).notifier);
+      await chat.open();
+      addTearDown(chat.close);
+      final got = c.read(chatProvider(chatInGroup('g1'))).messages.single;
+      expect((got.senderName, got.fromMe), ('Budi S.', false));
+      expect(backend.params('group_messages')['p_group'], 'g1');
+      expect(backend.params('mark_group_read'), {'p_group': 'g1'});
+
+      await chat.send(ChatKind.text, body: 'Siap', reply: ChatReply.of(got));
+      final p = backend.params('send_group_message');
+      expect((p['p_group'], p['p_body'], p['p_reply_to']), ('g1', 'Siap', 'm1'));
+      expect(c.read(chatProvider(chatInGroup('g1'))).messages.first.reply!.who, 'Budi S.');
+      expect(backend.names, isNot(contains('send_chat_message')));
     });
   });
 
@@ -348,7 +460,7 @@ void main() {
         ..answers['send_chat_message'] = [
           {'id': 'm3', 'created_at': '2026-11-10T09:00:00Z'},
         ];
-      final c = await pump(tester, const ChatPage(friendId: budi, name: 'Budi S.'));
+      final c = await pump(tester, ChatPage(chat: chatWith(budi), name: 'Budi S.'));
       expect(find.text('Kumpul jam 5'), findsOneWidget);
       expect(find.text('LOCATION'), findsOneWidget);
       expect(find.text('Show on map'), findsOneWidget);
@@ -367,6 +479,89 @@ void main() {
       }
       expect(find.text('For Pro and Enterprise accounts'), findsOneWidget);
       expect(tester.widget<ListTile>(find.byKey(const Key('chat-send-map'))).enabled, isFalse);
+      await done(tester, c);
+    });
+
+    testWidgets('a group chat: who sent what, a quoted reply, replying from the menu, the members', (tester) async {
+      backend
+        ..answers['my_chat_groups'] = [groupRow(last: 'Siap', unread: 1)]
+        ..answers['group_messages'] = [
+          {
+            ...messageRow('m2', body: 'Siap, jam 5 di basecamp', at: '2026-11-10T08:01:00Z'),
+            'sender_id': 'u3',
+            'sender_name': 'Citra P.',
+            'reply_to': 'm1',
+            'reply_name': 'Budi S.',
+            'reply_kind': 'text',
+            'reply_body': 'Kumpul jam 5',
+          },
+          {...messageRow('m1', body: 'Kumpul jam 5'), 'sender_id': budi, 'sender_name': 'Budi S.'},
+        ]
+        ..answers['chat_group_members'] = [
+          {'user_id': rina, 'name': 'Rina W.', 'is_me': true, 'since': '2026-11-05T00:00:00Z'},
+          {
+            'user_id': budi,
+            'name': 'Budi S.',
+            'is_manager': true,
+            'organization': 'Mapala UI',
+            'since': '2026-11-05T00:00:00Z',
+          },
+        ]
+        ..answers['send_group_message'] = [
+          {'id': 'm3', 'created_at': '2026-11-10T09:00:00Z'},
+        ];
+      final c = await pump(tester, ChatPage(chat: chatInGroup('g1'), name: 'Tim Merbabu'));
+      expect(find.byKey(const Key('sender-m1')), findsOneWidget, reason: "Budi's name above his message");
+      expect(find.byKey(const Key('sender-m2')), findsOneWidget);
+      expect(find.byKey(const Key('quote-m1')), findsOneWidget, reason: 'the reply quotes Budi');
+      expect(find.text('Kumpul jam 5'), findsNWidgets(2), reason: 'the message and its quote');
+      expect(find.textContaining('3 members'), findsOneWidget);
+
+      await tester.longPress(find.byKey(const Key('message-m2')));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('chat-delete')), findsNothing, reason: 'not mine, not the maker');
+      await tester.tap(find.byKey(const Key('chat-reply')));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('chat-reply-bar')), findsOneWidget);
+      expect(find.text('Replying to Citra P.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('chat-input')), 'Oke');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('chat-send')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(backend.params('send_group_message')['p_reply_to'], 'm2');
+      expect(find.byKey(const Key('chat-reply-bar')), findsNothing, reason: 'sent: the bar goes');
+      expect(find.byKey(const Key('quote-m2')), findsOneWidget, reason: 'my reply shows its quote at once');
+
+      await tester.tap(find.byKey(const Key('chat-members')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('member-$budi')), findsOneWidget);
+      expect(find.text('Maker'), findsOneWidget);
+      expect(find.byKey(const Key('group-add-members')), findsNothing, reason: 'only the maker adds');
+      await done(tester, c);
+    });
+
+    testWidgets('Friends: my groups are listed; making one is for Pro and up', (tester) async {
+      backend.answers['my_chat_groups'] = [groupRow(kind: 'club', name: 'SAR Magelang', members: 12)];
+      final c = await pump(tester, const FriendsPage());
+      expect(find.text('SAR Magelang'), findsOneWidget, reason: 'in Chats too');
+      await tester.tap(find.byKey(const Key('friends-tab-friends')));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('group-g1')), findsOneWidget);
+      expect(find.textContaining('Club chat · 12 members'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('group-create')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('group-pro-note')), findsOneWidget, reason: 'Free account');
+      expect(find.byKey(const Key('group-save')), findsNothing);
       await done(tester, c);
     });
   });

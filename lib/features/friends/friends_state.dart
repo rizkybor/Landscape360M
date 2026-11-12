@@ -11,11 +11,12 @@ import '../../domain/survey/survey_model.dart' show newUuid;
 import '../community/community_state.dart' show communityBackendProvider, communityPrefsProvider;
 import '../tracks/track_recorder_state.dart' show onlineProvider;
 
-// Friends & Chat in the app (docs/FRIENDS_PRD.md): the friend list and requests (read again
-// every 30 s while Friends is open), the unread badge (when the app opens or comes back, and
-// after a chat is read), and each chat: asked for changes every 15 s while it is open, the last
-// 50 messages kept on the phone to read without signal, and messages written without signal
-// kept on the phone and sent once it is back (each with a client id, so never twice).
+// Friends & Chat in the app (docs/FRIENDS_PRD.md): the friend list, requests and groups (read
+// again every 30 s while Friends is open), the unread badge (when the app opens or comes back,
+// and after a chat is read), and each chat, with a friend or a group: asked for changes every
+// 15 s while it is open, the last 50 messages kept on the phone to read without signal, and
+// messages written without signal kept on the phone and sent once it is back (each with a client
+// id, so never twice).
 
 final friendsRepositoryProvider = Provider<FriendsRepository>(
   (ref) => FriendsRepository(ref.watch(communityBackendProvider)),
@@ -29,15 +30,16 @@ String _message(Object e) => e is CommunityException ? e.message : '$e';
 bool _offline(Object e) => e is CommunityException && e.offline;
 
 String friendsCacheKey(String userId) => 'l360-friends-$userId';
-String chatCacheKey(String userId, String friendId) => 'l360-chat-$userId-$friendId';
+String chatCacheKey(String userId, ChatRef chat) => 'l360-chat-$userId-${chat.group ? 'g-' : ''}${chat.id}';
 String chatOutboxKey(String userId) => 'l360-chat-outbox-$userId';
 
-// --- Friends and requests ------------------------------------------------------------------------
+// --- Friends, requests and groups ----------------------------------------------------------------
 
 class FriendsState {
   const FriendsState({
     this.friends = const [],
     this.requests = const [],
+    this.groups = const [],
     this.loading = false,
     this.loaded = false,
     this.error,
@@ -45,6 +47,7 @@ class FriendsState {
 
   final List<Friend> friends;
   final List<FriendRequest> requests;
+  final List<ChatGroup> groups;
   final bool loading;
   final bool loaded;
   final String? error;
@@ -58,23 +61,23 @@ class FriendsState {
       if (r.direction == RequestDirection.outgoing) r,
   ];
 
-  /// Friends with a chat, the most recent first
-  List<Friend> get chats => [
-    for (final f in friends)
-      if (f.lastAt != null) f,
-  ];
+  /// Friends with a chat and groups, the most recent first
+  List<ChatEntry> get chats => chatEntries(friends, groups);
 
   Friend? byId(String id) => friends.where((f) => f.userId == id).firstOrNull;
+  ChatGroup? groupById(String id) => groups.where((g) => g.id == id).firstOrNull;
 
   FriendsState copyWith({
     List<Friend>? friends,
     List<FriendRequest>? requests,
+    List<ChatGroup>? groups,
     bool? loading,
     bool? loaded,
     String? Function()? error,
   }) => FriendsState(
     friends: friends ?? this.friends,
     requests: requests ?? this.requests,
+    groups: groups ?? this.groups,
     loading: loading ?? this.loading,
     loaded: loaded ?? this.loaded,
     error: error == null ? this.error : error(),
@@ -123,8 +126,17 @@ class FriendsController extends Notifier<FriendsState> {
     try {
       final raw = await ref.read(communityPrefsProvider).getString(friendsCacheKey(userId));
       if (raw == null || !ref.mounted || state.loaded) return;
-      final rows = [for (final r in jsonDecode(raw) as List) Map<String, dynamic>.from(r as Map)];
-      state = state.copyWith(friends: rows.map(Friend.fromRow).toList());
+      final json = jsonDecode(raw);
+      // Before groups the cache was the friend list alone
+      final friends = json is Map ? json['friends'] : json;
+      final groups = json is Map ? json['groups'] : null;
+      List<Map<String, dynamic>> rows(Object? v) => [
+        for (final r in (v is List ? v : const <Object?>[])) Map<String, dynamic>.from(r as Map),
+      ];
+      state = state.copyWith(
+        friends: rows(friends).map(Friend.fromRow).toList(),
+        groups: rows(groups).map(ChatGroup.fromRow).toList(),
+      );
     } on Object {
       // Unreadable cache: the server answers
     }
@@ -137,32 +149,33 @@ class FriendsController extends Notifier<FriendsState> {
     try {
       final friends = await _repo.friends();
       final requests = await _repo.requests();
+      final groups = await _repo.groups();
       if (!ref.mounted || _userId != userId) return;
-      state = state.copyWith(friends: friends, requests: requests, loading: false, loaded: true, error: () => null);
+      state = state.copyWith(
+        friends: friends,
+        requests: requests,
+        groups: groups,
+        loading: false,
+        loaded: true,
+        error: () => null,
+      );
       unawaited(ref.read(friendsUnreadProvider.notifier).refresh());
       unawaited(
         ref
             .read(communityPrefsProvider)
-            .setString(friendsCacheKey(userId), jsonEncode([for (final f in friends) _friendRow(f)])),
+            .setString(
+              friendsCacheKey(userId),
+              jsonEncode({
+                'friends': [for (final f in friends) f.toRow()],
+                'groups': [for (final g in groups) g.toRow()],
+              }),
+            ),
       );
     } on Object catch (e) {
       if (!ref.mounted) return;
       state = state.copyWith(loading: false, error: () => _offline(e) ? null : _message(e));
     }
   }
-
-  static Map<String, Object?> _friendRow(Friend f) => {
-    'user_id': f.userId,
-    'name': f.name,
-    'organization': f.organization,
-    'since': f.since.toUtc().toIso8601String(),
-    'last_at': f.lastAt?.toUtc().toIso8601String(),
-    'last_kind': f.lastKind?.name,
-    'last_body': f.lastBody,
-    'last_from_me': f.lastFromMe,
-    'last_deleted': f.lastDeleted,
-    'unread': f.unread,
-  };
 
   Future<void> requestByEmail(String email) async {
     await _repo.requestByEmail(email);
@@ -184,7 +197,57 @@ class FriendsController extends Notifier<FriendsState> {
     await _repo.remove(userId);
     await refresh();
   }
+
+  // --- Groups ------------------------------------------------------------------------------------
+
+  /// A new group with these friends in it; returns its id
+  Future<String> createGroup(String name, List<String> friendIds) async {
+    final id = await _repo.createGroup(name);
+    if (friendIds.isNotEmpty) await _repo.addGroupMembers(id, friendIds);
+    await refresh();
+    return id;
+  }
+
+  /// The club's chat (made now by its leader when there was none); returns its id
+  Future<String> openClubChat(String clubId) async {
+    final id = await _repo.createClubChat(clubId);
+    await refresh();
+    return id;
+  }
+
+  Future<int> addMembers(String groupId, List<String> friendIds) async {
+    final n = await _repo.addGroupMembers(groupId, friendIds);
+    await refresh();
+    return n;
+  }
+
+  Future<void> removeMember(String groupId, String userId) async {
+    await _repo.removeGroupMember(groupId, userId);
+    await refresh();
+  }
+
+  Future<void> renameGroup(String groupId, String name) async {
+    await _repo.renameGroup(groupId, name);
+    await refresh();
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    await _repo.deleteGroup(groupId);
+    await refresh();
+  }
 }
+
+/// A group's members, read when its page opens
+final groupMembersProvider = FutureProvider.autoDispose.family<List<GroupMember>, String>(
+  (ref, groupId) => ref.watch(friendsRepositoryProvider).groupMembers(groupId),
+);
+
+/// The club chat's id for a club member, or null while the leader has not opened one
+final clubChatProvider = FutureProvider.autoDispose.family<String?, String>((ref, clubId) {
+  // Opening one (or leaving the club) changes the answer
+  ref.watch(friendsProvider.select((s) => s.groups.length));
+  return ref.watch(friendsRepositoryProvider).clubChatGroup(clubId);
+});
 
 // --- The badge -----------------------------------------------------------------------------------
 
@@ -218,17 +281,23 @@ class FriendsUnreadController extends Notifier<FriendsUnread> {
 // --- Messages waiting for signal -----------------------------------------------------------------
 
 class QueuedMessage {
-  const QueuedMessage({required this.friendId, required this.message});
+  const QueuedMessage({required this.chat, required this.message});
 
   factory QueuedMessage.fromJson(Map<String, dynamic> j) => QueuedMessage(
-    friendId: '${j['friendId']}',
+    // 'friendId' alone: queued before groups existed
+    chat: j['chat'] is Map
+        ? (group: (j['chat'] as Map)['group'] == true, id: '${(j['chat'] as Map)['id']}')
+        : chatWith('${j['friendId']}'),
     message: ChatMessage.fromJson(Map<String, dynamic>.from(j['message'] as Map)),
   );
 
-  final String friendId;
+  final ChatRef chat;
   final ChatMessage message;
 
-  Map<String, Object?> toJson() => {'friendId': friendId, 'message': message.toJson()};
+  Map<String, Object?> toJson() => {
+    'chat': {'group': chat.group, 'id': chat.id},
+    'message': message.toJson(),
+  };
 }
 
 final chatOutboxProvider = NotifierProvider<ChatOutboxController, List<QueuedMessage>>(ChatOutboxController.new);
@@ -271,13 +340,13 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
         .setString(chatOutboxKey(userId), jsonEncode([for (final q in state) q.toJson()]));
   }
 
-  List<QueuedMessage> forFriend(String friendId) => [
+  List<QueuedMessage> forChat(ChatRef chat) => [
     for (final q in state)
-      if (q.friendId == friendId) q,
+      if (q.chat == chat) q,
   ];
 
-  Future<void> add(String friendId, ChatMessage m) async {
-    state = [...state, QueuedMessage(friendId: friendId, message: m)];
+  Future<void> add(ChatRef chat, ChatMessage m) async {
+    state = [...state, QueuedMessage(chat: chat, message: m)];
     await _save();
     await flush();
   }
@@ -288,7 +357,7 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
       for (final q in state)
         q.message.id == clientId
             ? QueuedMessage(
-                friendId: q.friendId,
+                chat: q.chat,
                 message: q.message.copyWith(state: SendState.queued, error: () => null),
               )
             : q,
@@ -316,7 +385,7 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
         try {
           final sent = await ref
               .read(friendsRepositoryProvider)
-              .send(q.friendId, kind: m.kind, body: m.body, data: m.data, clientId: m.id);
+              .send(q.chat, kind: m.kind, body: m.body, data: m.data, clientId: m.id, replyTo: m.reply?.id);
           if (!ref.mounted) return;
           state = [
             for (final x in state)
@@ -324,7 +393,7 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
           ];
           await _save();
           ref
-              .read(chatProvider(q.friendId).notifier)
+              .read(chatProvider(q.chat).notifier)
               .delivered(
                 ChatMessage(
                   id: sent.id,
@@ -333,6 +402,7 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
                   kind: m.kind,
                   body: m.body,
                   data: m.data,
+                  reply: m.reply,
                   createdAt: sent.createdAt,
                   updatedAt: sent.createdAt,
                 ),
@@ -343,7 +413,7 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
             for (final x in state)
               x.message.id == m.id
                   ? QueuedMessage(
-                      friendId: x.friendId,
+                      chat: x.chat,
                       message: m.copyWith(state: SendState.failed, error: () => _message(e)),
                     )
                   : x,
@@ -357,7 +427,7 @@ class ChatOutboxController extends Notifier<List<QueuedMessage>> {
   }
 }
 
-// --- One chat ------------------------------------------------------------------------------------
+// --- One chat (with a friend or a group) -----------------------------------------------------------
 
 class ChatState {
   const ChatState({
@@ -390,12 +460,12 @@ class ChatState {
   );
 }
 
-final chatProvider = NotifierProvider.family<ChatController, ChatState, String>(ChatController.new);
+final chatProvider = NotifierProvider.family<ChatController, ChatState, ChatRef>(ChatController.new);
 
 class ChatController extends Notifier<ChatState> {
-  ChatController(this.friendId);
+  ChatController(this.chat);
 
-  final String friendId;
+  final ChatRef chat;
   Timer? _timer;
   DateTime? _since;
 
@@ -425,7 +495,7 @@ class ChatController extends Notifier<ChatState> {
     final userId = _userId;
     if (userId == null || state.messages.isNotEmpty) return;
     try {
-      final raw = await ref.read(communityPrefsProvider).getString(chatCacheKey(userId, friendId));
+      final raw = await ref.read(communityPrefsProvider).getString(chatCacheKey(userId, chat));
       if (raw == null || !ref.mounted) return;
       state = state.copyWith(
         messages: [for (final j in jsonDecode(raw) as List) ChatMessage.fromJson(Map<String, dynamic>.from(j as Map))],
@@ -441,10 +511,7 @@ class ChatController extends Notifier<ChatState> {
     unawaited(
       ref
           .read(communityPrefsProvider)
-          .setString(
-            chatCacheKey(userId, friendId),
-            jsonEncode([for (final m in messages.take(_cacheSize)) m.toJson()]),
-          ),
+          .setString(chatCacheKey(userId, chat), jsonEncode([for (final m in messages.take(_cacheSize)) m.toJson()])),
     );
   }
 
@@ -460,7 +527,7 @@ class ChatController extends Notifier<ChatState> {
   Future<void> _load() async {
     state = state.copyWith(loading: true);
     try {
-      final page = await _repo.messages(friendId);
+      final page = await _repo.messages(chat);
       if (!ref.mounted) return;
       final merged = mergeMessages([
         for (final m in state.messages)
@@ -469,7 +536,7 @@ class ChatController extends Notifier<ChatState> {
       _since = _newest(page);
       state = state.copyWith(messages: merged, loading: false, hasMore: page.length >= 30, error: () => null);
       _keep(merged);
-      await _markRead();
+      await _markRead(page);
     } on Object catch (e) {
       if (!ref.mounted) return;
       state = state.copyWith(loading: false, error: () => _offline(e) ? null : _message(e));
@@ -480,14 +547,14 @@ class ChatController extends Notifier<ChatState> {
   Future<void> poll() async {
     if (_since == null) return _load();
     try {
-      final changed = await _repo.messages(friendId, since: _since);
+      final changed = await _repo.messages(chat, since: _since);
       if (!ref.mounted || changed.isEmpty) return;
       final merged = mergeMessages(state.messages, changed);
       final newest = _newest(changed);
       if (newest != null && (_since == null || newest.isAfter(_since!))) _since = newest;
       state = state.copyWith(messages: merged, error: () => null);
       _keep(merged);
-      if (changed.any((m) => !m.fromMe && m.readAt == null)) await _markRead();
+      await _markRead(changed);
     } on Object {
       // No signal: the next look tries again
     }
@@ -498,7 +565,7 @@ class ChatController extends Notifier<ChatState> {
     state = state.copyWith(loadingOlder: true);
     try {
       final oldest = state.messages.last.createdAt;
-      final page = await _repo.messages(friendId, before: oldest);
+      final page = await _repo.messages(chat, before: oldest);
       if (!ref.mounted) return;
       state = state.copyWith(
         messages: mergeMessages(state.messages, page),
@@ -510,10 +577,14 @@ class ChatController extends Notifier<ChatState> {
     }
   }
 
-  Future<void> _markRead() async {
-    if (!state.messages.any((m) => !m.fromMe && m.readAt == null && !m.deleted)) return;
+  /// A friend's unread messages are marked; a group once anything new from others came in
+  Future<void> _markRead(List<ChatMessage> fresh) async {
+    final due = chat.group
+        ? fresh.any((m) => !m.fromMe && !m.deleted)
+        : state.messages.any((m) => !m.fromMe && m.readAt == null && !m.deleted);
+    if (!due) return;
     try {
-      await _repo.markRead(friendId);
+      await _repo.markRead(chat);
       unawaited(ref.read(friendsUnreadProvider.notifier).refresh());
     } on Object {
       // Marked next time
@@ -521,12 +592,12 @@ class ChatController extends Notifier<ChatState> {
   }
 
   /// Puts a message in the queue (sent at once with signal)
-  Future<void> send(ChatKind kind, {String? body, Map<String, dynamic>? data}) {
+  Future<void> send(ChatKind kind, {String? body, Map<String, dynamic>? data, ChatReply? reply}) {
     final id = newUuid();
     return ref
         .read(chatOutboxProvider.notifier)
         .add(
-          friendId,
+          chat,
           ChatMessage(
             id: id,
             clientId: id,
@@ -534,6 +605,7 @@ class ChatController extends Notifier<ChatState> {
             kind: kind,
             body: body?.trim(),
             data: data,
+            reply: reply,
             createdAt: DateTime.now().toUtc(),
             state: SendState.queued,
           ),
