@@ -7,12 +7,13 @@ built; it works once the migration below is applied.
 | File here | Copy to | What it is |
 |---|---|---|
 | `20261111000032_friends_chat.sql` | `supabase/migrations/` | Tables and functions (required for app and web) |
+| `20261112000033_chat_groups.sql` | `supabase/migrations/` | Groups (club chats, groups of friends) and replies; run after 0032 |
 | `src/lib/friends.ts` | `src/lib/` | Calls to the functions |
 | `src/components/FriendsPanel.tsx` | `src/components/` | Friends button, panel, chat, and the `/?friend=` card |
 
 ## 1. Database (required)
 
-Run the migration in the Supabase SQL editor, or `supabase db push`. It adds four tables
+Run both migrations, 0032 then 0033, in the Supabase SQL editor, or `supabase db push`. 0032 adds four tables
 (`friend_links`, `friend_requests`, `friendships`, `chat_messages`) and the functions. The tables
 have RLS on with no policies, so they are read only through the functions; each function checks
 friendship, plan and daily limits. Everything is deleted with the account (`ON DELETE CASCADE`).
@@ -26,6 +27,16 @@ Limits per plan (FRIENDS_PRD.md §7), in `friends_limits`:
 | Messages a day | 200 | 1,000 | 3,000 | — |
 | Friend requests a day | 20 | 50 | 100 | — |
 | Send map data | — | ✓ | ✓ | ✓ |
+| Groups one may make | — | 10 | 30 | — |
+| Members per group | — | 50 | 200 | — |
+
+0033 (FRIENDS_PRD.md §15) adds `chat_groups`, `chat_group_members`, `chat_group_reads`, and
+`group_id` / `reply_to` on `chat_messages`: a club chat opened by the club leader (its members are
+the club's), groups a Pro account makes from its friends (only the maker adds friends, removes,
+renames, deletes), and replies that quote the message they answer. Checked on Postgres 14 with 47
+scenarios (limits, friends-only adding, leaving, the club's members following the club, the
+maker's and leader's deletes, replies only within the same chat, everything gone with the group
+or the account).
 
 Checked on Postgres 14: requests by email (same answer whether the email exists or not) and by
 link, accepting, asking back makes friends at once, renewing the link, own link refused, chat only
@@ -72,9 +83,9 @@ waiting), My QR and Add friend; the logo in the header is `/android-chrome-192x1
 messages with ✓ / ✓✓ (read), and map cards with **Show on map**. Enter sends, Shift+Enter makes a
 new line.
 
-On the web a chat sends text and "my location"; map data sent from the app (track, area,
-location, Field Work) shows with **Show on map**. Sending map data from the web can follow later
-with the Community attachment picker.
+On the web, chats are listed with their unread counts, but opening one shows that reading and
+writing messages (and groups, replies, locations, map data) is in the app only; the web chat view
+was removed on 12 November 2026.
 
 ## 3. Links
 

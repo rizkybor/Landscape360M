@@ -19,10 +19,13 @@ import '../map/share_location_sheet.dart' show phoneFixProvider;
 import '../map/shared_links.dart' show sharedLinkProvider;
 import 'friends_page.dart' show FriendAvatar;
 import 'friends_state.dart';
+import 'group_sheets.dart' show GroupAvatar, showGroupMembers;
 
-// One chat with a friend: messages newest at the bottom, read again every 15 s while open; send
-// text, my location (one fix), or map data (Pro and up). Messages written without signal show a
-// clock and go once it is back; a message can be taken back within an hour.
+// One chat, with a friend or a group: messages newest at the bottom, read again every 15 s while
+// open; send text, my location (one fix), or map data (Pro and up), as a reply to an earlier
+// message when wanted. Messages written without signal show a clock and go once it is back; a
+// message can be taken back within an hour (in a group, its maker tidies any time). In a group
+// each message shows who sent it, and the header opens the members.
 
 String _thousands(int n) => n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 
@@ -37,16 +40,23 @@ String _message(Object e) => e is CommunityException ? e.message : '$e';
 Future<void> openChat(BuildContext context, String friendId, String name) =>
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
-        builder: (_) => ChatPage(friendId: friendId, name: name),
+        builder: (_) => ChatPage(chat: chatWith(friendId), name: name),
+      ),
+    );
+
+Future<void> openGroupChat(BuildContext context, String groupId, String name) =>
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatPage(chat: chatInGroup(groupId), name: name),
       ),
     );
 
 void _toMap(BuildContext context) => Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
 
 class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key, required this.friendId, required this.name});
+  const ChatPage({super.key, required this.chat, required this.name});
 
-  final String friendId;
+  final ChatRef chat;
   final String name;
 
   @override
@@ -56,23 +66,30 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final _text = TextEditingController();
   final _scroll = ScrollController();
+  final _focus = FocusNode();
   // Read here, not in dispose (ref is gone by then)
   late final ChatController _chat;
   late final FriendsController _friends;
   bool _locating = false;
   String? _error;
+  ChatReply? _replyTo;
+
+  bool get _group => widget.chat.group;
 
   @override
   void initState() {
     super.initState();
-    _chat = ref.read(chatProvider(widget.friendId).notifier);
+    _chat = ref.read(chatProvider(widget.chat).notifier);
     _friends = ref.read(friendsProvider.notifier);
     _scroll.addListener(() {
       // The list is reversed: the top is the end
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 200) unawaited(_chat.loadOlder());
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_chat.open());
+      if (!mounted) return;
+      unawaited(_chat.open());
+      // Opened straight from a club or a link: the friend's or group's details are not read yet
+      if (!ref.read(friendsProvider).loaded) unawaited(_friends.refresh());
     });
   }
 
@@ -84,7 +101,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     unawaited(Future(_friends.refresh));
     _text.dispose();
     _scroll.dispose();
+    _focus.dispose();
     super.dispose();
+  }
+
+  ChatReply? _takeReply() {
+    final r = _replyTo;
+    if (r != null) setState(() => _replyTo = null);
+    return r;
   }
 
   Future<void> _sendText() async {
@@ -92,7 +116,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (body.isEmpty) return;
     _text.clear();
     setState(() => _error = null);
-    await _chat.send(ChatKind.text, body: body);
+    await _chat.send(ChatKind.text, body: body, reply: _takeReply());
   }
 
   Future<void> _sendLocation() async {
@@ -105,6 +129,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       await _chat.send(
         ChatKind.location,
         data: ChatLocation(lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, elevation: fix.elevation).toJson(),
+        reply: _takeReply(),
       );
     } on Object catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -116,7 +141,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Future<void> _sendAttachment() async {
     final a = await pickAttachment(context);
     if (a == null || !mounted) return;
-    await _chat.send(ChatKind.attachment, data: a.toJson());
+    await _chat.send(ChatKind.attachment, data: a.toJson(), reply: _takeReply());
   }
 
   Future<void> _more() async {
@@ -152,7 +177,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (choice == 'map') await _sendAttachment();
   }
 
-  Future<void> _actions(ChatMessage m) async {
+  void _reply(ChatMessage m) {
+    setState(() => _replyTo = ChatReply.of(m, myName: ref.read(profileProvider).value?.displayName));
+    _focus.requestFocus();
+  }
+
+  Future<void> _actions(ChatMessage m, {required bool canDelete}) async {
     final queued = m.state != SendState.sent;
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -160,6 +190,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (!queued && !m.deleted)
+              ListTile(
+                key: const Key('chat-reply'),
+                leading: const Icon(Icons.reply, color: L360Colors.forest700),
+                title: const Text('Reply'),
+                onTap: () => Navigator.pop(sheet, 'reply'),
+              ),
             if (m.state == SendState.failed)
               ListTile(
                 key: const Key('chat-retry'),
@@ -167,18 +204,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 title: const Text('Try again'),
                 onTap: () => Navigator.pop(sheet, 'retry'),
               ),
-            ListTile(
-              key: const Key('chat-delete'),
-              leading: const Icon(Icons.delete_outline, color: L360Colors.brick500),
-              title: Text(queued ? 'Do not send' : 'Delete for both'),
-              onTap: () => Navigator.pop(sheet, 'delete'),
-            ),
+            if (queued || canDelete)
+              ListTile(
+                key: const Key('chat-delete'),
+                leading: const Icon(Icons.delete_outline, color: L360Colors.brick500),
+                title: Text(
+                  queued
+                      ? 'Do not send'
+                      : _group
+                      ? 'Delete for everyone'
+                      : 'Delete for both',
+                ),
+                onTap: () => Navigator.pop(sheet, 'delete'),
+              ),
           ],
         ),
       ),
     );
     if (!mounted || choice == null) return;
     try {
+      if (choice == 'reply') _reply(m);
       if (choice == 'retry') await ref.read(chatOutboxProvider.notifier).retry(m.id);
       if (choice == 'delete') {
         queued ? await ref.read(chatOutboxProvider.notifier).discard(m.id) : await _chat.delete(m);
@@ -193,24 +238,36 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _toMap(context);
   }
 
-  void _showAttachment(Attachment a) {
-    ref.read(communityFocusProvider.notifier).showFocus(MapFocus(title: '${widget.name}: ${a.name}', attachment: a));
+  void _showAttachment(ChatMessage m, Attachment a) {
+    final who = m.fromMe ? 'You' : (m.senderName ?? widget.name);
+    ref.read(communityFocusProvider.notifier).showFocus(MapFocus(title: '$who: ${a.name}', attachment: a));
     _toMap(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = ref.watch(chatProvider(widget.friendId));
+    final s = ref.watch(chatProvider(widget.chat));
     final queued = [
       for (final q in ref.watch(chatOutboxProvider))
-        if (q.friendId == widget.friendId) q.message,
+        if (q.chat == widget.chat) q.message,
     ];
     final messages = mergeMessages(s.messages, queued);
-    final friend = ref.watch(friendsProvider.select((f) => f.byId(widget.friendId)));
-    final isFriend = ref.watch(friendsProvider.select((f) => !f.loaded || f.byId(widget.friendId) != null));
+    final friend = _group ? null : ref.watch(friendsProvider.select((f) => f.byId(widget.chat.id)));
+    final group = _group ? ref.watch(friendsProvider.select((f) => f.groupById(widget.chat.id))) : null;
+    final loaded = ref.watch(friendsProvider.select((f) => f.loaded));
+    // Still in it: a friend, or a member of the group
+    final canWrite = !loaded || (_group ? group != null : friend != null);
+    final manager = group?.isManager ?? false;
     final now = DateTime.now();
-    // My newest message that was read: the double tick turns green there
+    // My newest message that was read: the double tick turns orange there
     final lastRead = messages.where((m) => m.fromMe).firstOrNull;
+    final name = group?.name ?? widget.name;
+    final subtitle = _group
+        ? [
+            group?.isClub ?? false ? 'Club chat' : 'Group',
+            if (group != null) '${group.memberCount} member${group.memberCount == 1 ? '' : 's'}',
+          ].join(' · ')
+        : friend?.organization ?? 'Landscape 360 friend';
     return Scaffold(
       backgroundColor: L360Colors.sand50,
       appBar: AppBar(
@@ -218,31 +275,44 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         surfaceTintColor: Colors.white,
         titleSpacing: 0,
         shape: const Border(bottom: BorderSide(color: L360Colors.sand200)),
-        title: Row(
-          children: [
-            FriendAvatar(name: widget.name, size: 38),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: L360Colors.ink),
-                  ),
-                  Text(
-                    friend?.organization ?? 'Landscape 360 friend',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
-                  ),
-                ],
+        title: InkWell(
+          key: const Key('chat-header'),
+          onTap: _group ? () => showGroupMembers(context, widget.chat.id) : null,
+          child: Row(
+            children: [
+              if (_group) GroupAvatar(isClub: group?.isClub ?? false, size: 38) else FriendAvatar(name: name, size: 38),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: L360Colors.ink),
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: L360Colors.sand600),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        actions: [
+          if (_group)
+            IconButton(
+              key: const Key('chat-members'),
+              tooltip: 'Members',
+              onPressed: () => showGroupMembers(context, widget.chat.id),
+              icon: const Icon(Icons.people_outline, color: L360Colors.forest700),
+            ),
+        ],
       ),
       body: SafeArea(
         bottom: false,
@@ -257,7 +327,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               child: CustomPaint(
                 painter: const _Contours(),
                 child: messages.isEmpty && !s.loading
-                    ? _EmptyChat(name: widget.name)
+                    ? _EmptyChat(name: name, group: group)
                     : ListView.builder(
                         key: const Key('chat-messages'),
                         controller: _scroll,
@@ -272,18 +342,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                               );
                             }
-                            return s.hasMore || friend == null
-                                ? const SizedBox.shrink()
-                                : _SinceChip(since: friend.since);
+                            if (s.hasMore) return const SizedBox.shrink();
+                            if (friend != null) return _SinceChip(since: friend.since);
+                            if (group != null) return _SinceChip(since: group.createdAt, group: group);
+                            return const SizedBox.shrink();
                           }
                           final m = messages[i];
                           // Reversed: i - 1 is the next (newer) message, i + 1 the previous (older)
                           final newer = i > 0 ? messages[i - 1] : null;
                           final older = i + 1 < messages.length ? messages[i + 1] : null;
                           final newDay = older == null || !_sameDay(older.createdAt, m.createdAt);
-                          final groupStart = newDay || older.fromMe != m.fromMe;
+                          final groupStart = newDay || older.fromMe != m.fromMe || older.senderId != m.senderId;
                           final groupEnd =
-                              newer == null || newer.fromMe != m.fromMe || !_sameDay(newer.createdAt, m.createdAt);
+                              newer == null ||
+                              newer.fromMe != m.fromMe ||
+                              newer.senderId != m.senderId ||
+                              !_sameDay(newer.createdAt, m.createdAt);
+                          final canDelete = m.canDelete(now) || (manager && !m.deleted && m.state == SendState.sent);
                           return Column(
                             children: [
                               if (newDay) _DayLabel(when: m.createdAt, now: now),
@@ -293,10 +368,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 now: now,
                                 groupStart: groupStart,
                                 groupEnd: groupEnd,
-                                showRead: m.fromMe && m.readAt != null && identical(m, lastRead),
-                                onLongPress: m.canDelete(now) || m.state != SendState.sent ? () => _actions(m) : null,
+                                inGroup: _group,
+                                showRead: !_group && m.fromMe && m.readAt != null && identical(m, lastRead),
+                                onLongPress: () => _actions(m, canDelete: canDelete),
                                 onShowLocation: _showLocation,
-                                onShowAttachment: _showAttachment,
+                                onShowAttachment: (a) => _showAttachment(m, a),
                               ),
                             ],
                           );
@@ -304,7 +380,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ),
               ),
             ),
-            if (!isFriend)
+            if (!canWrite)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -312,17 +388,27 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   color: Colors.white,
                   border: Border(top: BorderSide(color: L360Colors.sand200)),
                 ),
-                child: const SafeArea(
+                child: SafeArea(
                   top: false,
                   child: Text(
-                    'You are no longer friends, so you cannot send messages.',
+                    _group
+                        ? 'You are no longer in this group, so you cannot send messages.'
+                        : 'You are no longer friends, so you cannot send messages.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: L360Colors.sand600),
+                    style: const TextStyle(color: L360Colors.sand600),
                   ),
                 ),
               )
             else
-              _Composer(controller: _text, locating: _locating, onSend: _sendText, onMore: _more),
+              _Composer(
+                controller: _text,
+                focus: _focus,
+                locating: _locating,
+                replyTo: _replyTo,
+                onCancelReply: () => setState(() => _replyTo = null),
+                onSend: _sendText,
+                onMore: _more,
+              ),
           ],
         ),
       ),
@@ -405,13 +491,16 @@ class _DayLabel extends StatelessWidget {
 }
 
 class _SinceChip extends StatelessWidget {
-  const _SinceChip({required this.since});
+  const _SinceChip({required this.since, this.group});
 
   final DateTime since;
+  final ChatGroup? group;
 
   @override
   Widget build(BuildContext context) {
     final d = since.toLocal();
+    final date = '${d.day} ${_months[d.month - 1]} ${d.year}';
+    final g = group;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
       child: Column(
@@ -419,8 +508,11 @@ class _SinceChip extends StatelessWidget {
           const Icon(Icons.lock_outline, size: 16, color: L360Colors.sand500),
           const SizedBox(height: 4),
           Text(
-            'Friends since ${d.day} ${_months[d.month - 1]} ${d.year}\n'
-            'Only the two of you can read this chat',
+            g == null
+                ? 'Friends since $date\nOnly the two of you can read this chat'
+                : g.isClub
+                ? 'Club chat since $date\nOnly members of the club can read it'
+                : 'Group since $date\nOnly its members can read it',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12, height: 1.4, color: L360Colors.sand500),
           ),
@@ -431,9 +523,10 @@ class _SinceChip extends StatelessWidget {
 }
 
 class _EmptyChat extends StatelessWidget {
-  const _EmptyChat({required this.name});
+  const _EmptyChat({required this.name, this.group});
 
   final String name;
+  final ChatGroup? group;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -442,17 +535,19 @@ class _EmptyChat extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FriendAvatar(name: name, size: 72),
+          if (group != null) GroupAvatar(isClub: group!.isClub, size: 72) else FriendAvatar(name: name, size: 72),
           const SizedBox(height: 14),
           Text(
             name,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: L360Colors.ink),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Say hello, or send your location.\nMessages arrive within about 15 seconds.',
+          Text(
+            group == null
+                ? 'Say hello, or send your location.\nMessages arrive within about 15 seconds.'
+                : 'Say hello to the group, or send your location.\nMessages arrive within about 15 seconds.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: L360Colors.sand600, height: 1.4),
+            style: const TextStyle(color: L360Colors.sand600, height: 1.4),
           ),
         ],
       ),
@@ -461,10 +556,21 @@ class _EmptyChat extends StatelessWidget {
 }
 
 class _Composer extends StatefulWidget {
-  const _Composer({required this.controller, required this.locating, required this.onSend, required this.onMore});
+  const _Composer({
+    required this.controller,
+    required this.focus,
+    required this.locating,
+    required this.replyTo,
+    required this.onCancelReply,
+    required this.onSend,
+    required this.onMore,
+  });
 
   final TextEditingController controller;
+  final FocusNode focus;
   final bool locating;
+  final ChatReply? replyTo;
+  final VoidCallback onCancelReply;
   final VoidCallback onSend;
   final VoidCallback onMore;
 
@@ -490,6 +596,7 @@ class _ComposerState extends State<_Composer> {
   @override
   Widget build(BuildContext context) {
     final empty = widget.controller.text.trim().isEmpty;
+    final reply = widget.replyTo;
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: const BoxDecoration(
@@ -498,66 +605,119 @@ class _ComposerState extends State<_Composer> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox.square(
-              dimension: 44,
-              child: IconButton(
-                key: const Key('chat-more'),
-                tooltip: 'Location or map data',
-                onPressed: widget.locating ? null : widget.onMore,
-                icon: widget.locating
-                    ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.add_circle_outline, size: 26, color: L360Colors.forest700),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: TextField(
-                key: const Key('chat-input'),
-                controller: widget.controller,
-                minLines: 1,
-                maxLines: 5,
-                maxLength: chatBodyMax,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Message',
-                  counterText: '',
-                  isDense: true,
-                  filled: true,
-                  fillColor: L360Colors.sand50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(color: L360Colors.sand200),
+            if (reply != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
+                child: Container(
+                  key: const Key('chat-reply-bar'),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                  decoration: BoxDecoration(
+                    color: L360Colors.sand50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: const Border(left: BorderSide(color: L360Colors.ember500, width: 3)),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(color: L360Colors.sand200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(color: L360Colors.forest500, width: 1.5),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.reply, size: 16, color: L360Colors.ember600),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Replying to ${reply.who}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: L360Colors.ember600,
+                              ),
+                            ),
+                            Text(
+                              reply.text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5, color: L360Colors.sand700),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('chat-reply-cancel'),
+                        tooltip: 'Cancel reply',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: widget.onCancelReply,
+                        icon: const Icon(Icons.close, size: 18, color: L360Colors.sand600),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox.square(
-              dimension: 44,
-              child: IconButton.filled(
-                key: const Key('chat-send'),
-                tooltip: 'Send',
-                style: IconButton.styleFrom(
-                  backgroundColor: _sendOrange,
-                  disabledBackgroundColor: L360Colors.sand200,
-                  disabledForegroundColor: Colors.white,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SizedBox.square(
+                  dimension: 44,
+                  child: IconButton(
+                    key: const Key('chat-more'),
+                    tooltip: 'Location or map data',
+                    onPressed: widget.locating ? null : widget.onMore,
+                    icon: widget.locating
+                        ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.add_circle_outline, size: 26, color: L360Colors.forest700),
+                  ),
                 ),
-                onPressed: empty ? null : widget.onSend,
-                icon: const Icon(Icons.arrow_upward_rounded, size: 22),
-              ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: TextField(
+                    key: const Key('chat-input'),
+                    controller: widget.controller,
+                    focusNode: widget.focus,
+                    minLines: 1,
+                    maxLines: 5,
+                    maxLength: chatBodyMax,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Message',
+                      counterText: '',
+                      isDense: true,
+                      filled: true,
+                      fillColor: L360Colors.sand50,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: const BorderSide(color: L360Colors.sand200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: const BorderSide(color: L360Colors.sand200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: const BorderSide(color: L360Colors.forest500, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox.square(
+                  dimension: 44,
+                  child: IconButton.filled(
+                    key: const Key('chat-send'),
+                    tooltip: 'Send',
+                    style: IconButton.styleFrom(
+                      backgroundColor: _sendOrange,
+                      disabledBackgroundColor: L360Colors.sand200,
+                      disabledForegroundColor: Colors.white,
+                    ),
+                    onPressed: empty ? null : widget.onSend,
+                    icon: const Icon(Icons.arrow_upward_rounded, size: 22),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -573,6 +733,7 @@ class _Bubble extends StatelessWidget {
     required this.now,
     required this.groupStart,
     required this.groupEnd,
+    required this.inGroup,
     required this.showRead,
     required this.onLongPress,
     required this.onShowLocation,
@@ -583,6 +744,7 @@ class _Bubble extends StatelessWidget {
   final DateTime now;
   final bool groupStart;
   final bool groupEnd;
+  final bool inGroup;
   final bool showRead;
   final VoidCallback? onLongPress;
   final void Function(ChatLocation) onShowLocation;
@@ -653,6 +815,8 @@ class _Bubble extends StatelessWidget {
             ),
             SendState.sent => Icon(Icons.done, size: 15, color: sub),
           };
+    final reply = m.deleted ? null : m.reply;
+    final sender = inGroup && !mine && groupStart ? m.senderName : null;
     const r = Radius.circular(18), tail = Radius.circular(5);
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -682,6 +846,23 @@ class _Bubble extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (sender != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(card ? 6 : 0, card ? 4 : 0, 0, 3),
+                            child: Text(
+                              sender,
+                              key: Key('sender-${m.id}'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: L360Colors.forest700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (reply != null) _Quote(reply: reply, mine: mine, card: card),
                       content,
                       Padding(
                         padding: card ? const EdgeInsets.fromLTRB(0, 4, 6, 2) : const EdgeInsets.only(top: 3),
@@ -711,6 +892,52 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The message a reply answers: who wrote it and its first words
+class _Quote extends StatelessWidget {
+  const _Quote({required this.reply, required this.mine, required this.card});
+
+  final ChatReply reply;
+  final bool mine;
+  final bool card;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: Key('quote-${reply.id}'),
+    width: double.infinity,
+    margin: EdgeInsets.fromLTRB(card ? 0 : 0, 2, 0, 6),
+    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+    decoration: BoxDecoration(
+      color: mine ? const Color(0x66FFFFFF) : L360Colors.sand50,
+      borderRadius: BorderRadius.circular(10),
+      border: Border(left: BorderSide(color: mine ? L360Colors.ember500 : L360Colors.forest500, width: 3)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          reply.who,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: mine ? L360Colors.ember600 : L360Colors.forest700,
+          ),
+        ),
+        Text(
+          reply.text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontStyle: reply.deleted ? FontStyle.italic : FontStyle.normal,
+            color: mine ? _peachSub : L360Colors.sand700,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 String _clock(DateTime when) {
