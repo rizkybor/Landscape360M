@@ -26,6 +26,8 @@ import '../friends/friends_state.dart' show friendsUnreadProvider;
 import '../guide/quick_guide.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
+import '../live/monitor_sheet.dart';
+import '../live/monitor_state.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
 import '../navigator/navigator_state.dart';
@@ -314,13 +316,13 @@ class _HeaderButton extends StatelessWidget {
   );
 }
 
-class _AccountButton extends StatelessWidget {
+class _AccountButton extends ConsumerWidget {
   const _AccountButton({required this.profile});
 
   final AccountProfile? profile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = profile;
     final name = p == null ? '' : (p.displayName.isEmpty ? p.email : p.displayName);
     return IconButton(
@@ -343,14 +345,32 @@ class _AccountButton extends StatelessWidget {
                   child: avatar,
                 );
               },
-              child: CircleAvatar(
-                radius: 14,
-                backgroundColor: L360Colors.forest700,
-                child: Text(
-                  name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-              ),
+              child: p.avatarPath != null
+                  ? ClipOval(
+                      child: Image.network(
+                        ref.watch(avatarUrlProvider)(p.avatarPath!),
+                        key: const Key('account-photo'),
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => CircleAvatar(
+                          radius: 14,
+                          backgroundColor: L360Colors.forest700,
+                          child: Text(
+                            name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    )
+                  : CircleAvatar(
+                      radius: 14,
+                      backgroundColor: L360Colors.forest700,
+                      child: Text(
+                        name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                    ),
             ),
     );
   }
@@ -461,6 +481,7 @@ class _ToolsSection extends ConsumerWidget {
     (Icons.layers_outlined, 'Basemaps', null),
     (Icons.architecture, 'Classic', null),
     (Icons.navigation_outlined, 'GPS', null),
+    (Icons.visibility_outlined, 'Monitor', null),
     (Icons.forum_outlined, 'Community', null),
   ];
 
@@ -573,6 +594,17 @@ class _ToolsSection extends ConsumerWidget {
     unawaited(showLiveTrackingSheet(context));
   }
 
+  /// Team Monitor (monitor accounts): the members sharing their position, live on the map
+  static void _openMonitor(BuildContext context, WidgetRef ref) {
+    if (ref.read(authUserIdProvider).value == null) {
+      unawaited(
+        showSignInSheet(context, title: 'Team Monitor', reason: 'Sign in with a monitor account to follow your team.'),
+      );
+      return;
+    }
+    unawaited(showMonitorSheet(context));
+  }
+
   static void _toggleAreas(BuildContext context, WidgetRef ref) {
     if (ref.read(authUserIdProvider).value == null) {
       unawaited(showSignInSheet(context, title: 'Marked Areas', reason: 'Sign in to draw, save and share areas.'));
@@ -590,7 +622,7 @@ class _ToolsSection extends ConsumerWidget {
     }
   }
 
-  static const _needsAccount = {'Track', 'Marked', 'Areas', 'Basemaps', 'GPS'};
+  static const _needsAccount = {'Track', 'Marked', 'Areas', 'Basemaps', 'GPS', 'Monitor'};
 
   static const _columns = 4;
   static const _gap = 10.0;
@@ -601,8 +633,9 @@ class _ToolsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => LayoutBuilder(
     builder: (context, constraints) {
       final side = ((constraints.maxWidth - _gap * (_columns - 1)) / _columns).floorToDouble();
-      // GPS Tracking is for members; monitor accounts watch on the web
+      // GPS Tracking is for members; Team Monitor for monitor accounts (and the admin)
       final member = ref.watch(profileProvider.select((p) => p.value?.isMember ?? true));
+      final monitor = ref.watch(profileProvider.select((p) => p.value?.canMonitor ?? false));
       final signedIn = ref.watch(authUserIdProvider.select((a) => a.value != null));
       return Wrap(
         alignment: WrapAlignment.center,
@@ -610,7 +643,7 @@ class _ToolsSection extends ConsumerWidget {
         runSpacing: _gap,
         children: [
           for (final (icon, label, phase) in tools)
-            if (label != 'GPS' || member)
+            if ((label != 'GPS' || member) && (label != 'Monitor' || monitor))
               SizedBox.square(
                 dimension: side,
                 child: ToolTile(
@@ -627,6 +660,7 @@ class _ToolsSection extends ConsumerWidget {
                     'Basemaps' => ref.watch(basemapsProvider.select((s) => s.basemaps.any((b) => b.active))),
                     'Areas' => ref.watch(areasProvider.select((s) => s.panelOpen || s.drawing || s.focusId != null)),
                     'GPS' => ref.watch(liveTrackingProvider.select((s) => s.on)),
+                    'Monitor' => ref.watch(monitorProvider.select((s) => s.on)),
                     'Classic' => ref.watch(classicProvider.select((s) => s.panelOpen)),
                     'Community' =>
                       ref.watch(communityLayerProvider.select((s) => s.shown)) ||
@@ -641,6 +675,7 @@ class _ToolsSection extends ConsumerWidget {
                     'Areas' => () => _toggleAreas(context, ref),
                     'Basemaps' => () => _openBasemaps(context, ref),
                     'GPS' => () => _openGps(context, ref),
+                    'Monitor' => () => _openMonitor(context, ref),
                     'Classic' => () => _toggleClassic(ref),
                     // Anyone can read; writing asks to sign in
                     'Community' => () => unawaited(showCommunitySheet(context)),

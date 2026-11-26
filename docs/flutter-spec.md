@@ -80,7 +80,7 @@ Legenda: **v1** = app v1 · **nanti** = app nanti · **web** = web saja.
 | Export GPX | `trackRecorderGeo.ts:buildGpx` | v1 |
 | Live tracking: broadcast posisi (Pro/Enterprise) | `services/TrackerService.ts`, `ControlPanel.tsx:831-870` | **v1 bersyarat** (lihat Q4 & temuan S1) |
 | "Record Activity" (`tracker_activity_sessions` + `tracker_logs`, hanya `pengguna360` Pro) | `TrackerService.ts`, `ControlPanel.tsx:251-254` | v1 bersyarat (Q4) |
-| Monitor live (Enterprise `monitor360`/admin) | `TrackerService.ts:615-680`, `LiveTrackerLayer.tsx` | v1 bersyarat (Q4) |
+| Monitor live (Enterprise `monitor360`/admin) | `TrackerService.ts:615-680`, `LiveTrackerLayer.tsx`, `TrackerHistoryViewer.tsx` | **dibangun 27 Nov 2026**: `features/live/monitor_*.dart` (Tools → Monitor, marker + jejak, kartu anggota, Tracking lists: Activities/Logs, GPX, hapus log; profil akun di kartu + foto di marker via `monitor_tracker_profiles`, 0034). Ekspor PDF web tidak dibuat |
 | Riwayat aktivitas & GPX dari `tracker_logs` | `TrackerHistoryViewer.tsx` | nanti |
 | Mode simulasi tracker | `TrackerService.ts:690-720` | **web** (alat demo) |
 
@@ -447,7 +447,7 @@ realtime (polling 30 s).
 | Share track | UI Enterprise/admin | RPC + RLS | — |
 | GPS broadcast | `ControlPanel.tsx:213-216,835`: bukan Free; flag `VITE_ENABLE_GPS_TRACKER` | **tidak ada** | S1, S2 |
 | Record Activity | `ControlPanel.tsx:251-254`: `pengguna360` + Pro | **tidak ada** (RLS hanya `user_id`) | S2 |
-| Monitor live | `monitor360` + Enterprise (`TrackerService.ts:624`) | realtime **tidak ada**; tabel `is_monitor()` | S1 |
+| Monitor live | `monitor360` + Enterprise (`TrackerService.ts:624`) | realtime: kanal privat `tracking-room` (`20261029000020`); tabel `is_monitor()` | dibangun |
 | Riwayat tracker | `TrackerHistoryViewer.tsx:82-86` | RPC/RLS milik sendiri atau `is_monitor()` | — |
 | Marked locations (10/100/1000, admin ∞) | `getMarkedLocationPolicy` | trigger | — |
 | Share lokasi / link lokasi / link area | Pro/Ent/admin | `can_share_marked_locations()` di RPC | — |
@@ -1077,3 +1077,8 @@ bahwa 112/115 tetap jalur utama).
    di-comment di `MapDashboard.tsx:4` (Q16).
 8. `ARCHITECTURE.md` (skema `TRACKING_LOGS` PostGIS, `full_name` di profiles, harga plan)
    sudah usang dibanding migration; jangan dipakai sebagai acuan skema.
+
+
+### Foto profil (27 Nov 2026)
+
+`domain/account/avatar.dart`, `ProfilePhoto` di `account_screen.dart`: persegi tengah ≤256 px JPEG ≤100 KB ke bucket `avatars` (`<uid>/avatar-<ms>.jpg`), `set_my_avatar` (migration 0035, salinan di `docs/backend/live-tracking/`). Sama dengan `src/lib/avatar.ts` dan `ProfilePhoto.tsx` di web.

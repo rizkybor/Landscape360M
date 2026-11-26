@@ -40,6 +40,7 @@ class AccountProfile {
     required this.canUseSos,
     this.organization,
     this.phone,
+    this.avatarPath,
     this.subscriptionExpiresAt,
   });
 
@@ -71,6 +72,7 @@ class AccountProfile {
       canUseSos: isAdmin || (row == null ? cachedCanUseSos ?? false : row['can_use_sos'] == true),
       organization: row?['organization'] as String?,
       phone: row?['phone'] as String?,
+      avatarPath: (row?['avatar_path'] as String?)?.trim().isEmpty ?? true ? null : row!['avatar_path'] as String,
       subscriptionExpiresAt: ended ? null : expiresAt,
     );
   }
@@ -84,6 +86,9 @@ class AccountProfile {
   final bool canUseSos;
   final String? organization;
   final String? phone;
+
+  /// My photo in the avatars bucket (set in User Account), or null
+  final String? avatarPath;
 
   /// End of a paid plan (null: Free, set by the admin, or the admin account)
   final DateTime? subscriptionExpiresAt;

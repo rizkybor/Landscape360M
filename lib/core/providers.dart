@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/account/account_repository.dart';
 import '../data/api/api_client.dart';
 import '../domain/account/account_rules.dart';
+import '../domain/account/avatar.dart';
 import '../domain/account/profile.dart';
 import 'config/app_config.dart';
 
@@ -53,6 +54,12 @@ final authUserIdProvider = StreamProvider<String?>((ref) {
 });
 
 /// The signed-in account (null when signed out)
+/// Public address of a profile photo in the avatars bucket
+final avatarUrlProvider = Provider<String Function(String path)>((ref) {
+  final url = ref.watch(appConfigProvider).supabaseUrl;
+  return (path) => avatarUrl(url, path);
+});
+
 final profileProvider = FutureProvider<AccountProfile?>((ref) async {
   final userId = ref.watch(authUserIdProvider).value;
   if (userId == null) return null;

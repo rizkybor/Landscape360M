@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
@@ -326,6 +329,152 @@ String _initials(String name) {
   return (first + second).toUpperCase();
 }
 
+/// A photo from the camera or the gallery (bytes), or null when cancelled; tests replace it
+typedef AvatarPicker = Future<Uint8List?> Function(ImageSource source);
+
+final avatarPickerProvider = Provider<AvatarPicker>(
+  (ref) => (source) async {
+    // The picker shrinks big photos natively first; the app then crops and re-encodes them
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1024, maxHeight: 1024, imageQuality: 92);
+    return file?.readAsBytes();
+  },
+);
+
+/// My photo (set here, as on the web's User Account) or my initials, with a camera button to
+/// change it and, on it, Remove photo
+class ProfilePhoto extends ConsumerStatefulWidget {
+  const ProfilePhoto({super.key, required this.profile, required this.initials, this.radius = 28});
+
+  final AccountProfile profile;
+  final String initials;
+  final double radius;
+
+  @override
+  ConsumerState<ProfilePhoto> createState() => _ProfilePhotoState();
+}
+
+class _ProfilePhotoState extends ConsumerState<ProfilePhoto> {
+  bool _busy = false;
+
+  Future<void> _change() async {
+    final hasPhoto = widget.profile.avatarPath != null;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const Key('avatar-camera'),
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(sheet, 'camera'),
+            ),
+            ListTile(
+              key: const Key('avatar-gallery'),
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from the gallery'),
+              onTap: () => Navigator.pop(sheet, 'gallery'),
+            ),
+            if (hasPhoto)
+              ListTile(
+                key: const Key('avatar-remove'),
+                leading: const Icon(Icons.delete_outline, color: L360Colors.brick500),
+                title: const Text('Remove photo'),
+                onTap: () => Navigator.pop(sheet, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    Uint8List? picked;
+    if (choice != 'remove') {
+      picked = await ref.read(avatarPickerProvider)(choice == 'camera' ? ImageSource.camera : ImageSource.gallery);
+      if (picked == null || !mounted) return;
+    }
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(accountRepositoryProvider).setAvatar(picked);
+      ref.invalidate(profileProvider);
+      messenger.showSnackBar(SnackBar(content: Text(picked == null ? 'Photo removed' : 'Photo updated')));
+    } on Object catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e is AccountException ? e.message : '$e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.radius;
+    final path = widget.profile.avatarPath;
+    final letters = CircleAvatar(
+      radius: r,
+      backgroundColor: L360Colors.forest700,
+      child: Text(
+        widget.initials,
+        style: TextStyle(color: Colors.white, fontSize: r * 0.72, fontWeight: FontWeight.w700),
+      ),
+    );
+    return SizedBox(
+      width: r * 2 + 6,
+      height: r * 2 + 6,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (path == null)
+            letters
+          else
+            ClipOval(
+              child: Image.network(
+                ref.watch(avatarUrlProvider)(path),
+                key: const Key('profile-photo'),
+                width: r * 2,
+                height: r * 2,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => letters,
+              ),
+            ),
+          if (_busy)
+            Positioned.fill(
+              child: Container(
+                width: r * 2,
+                height: r * 2,
+                decoration: const BoxDecoration(color: Color(0x66000000), shape: BoxShape.circle),
+                child: const Center(
+                  child: SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Material(
+              key: const Key('profile-photo-change'),
+              color: Colors.white,
+              shape: const CircleBorder(side: BorderSide(color: L360Colors.sand200)),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _busy ? null : _change,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.photo_camera_outlined, size: 15, color: L360Colors.forest700),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Who is signed in: avatar, name and email, plan and role, contact, Edit
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({required this.profile});
@@ -350,14 +499,7 @@ class _ProfileCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: L360Colors.forest700,
-                  child: Text(
-                    _initials(name),
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-                  ),
-                ),
+                ProfilePhoto(profile: p, initials: _initials(name)),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(

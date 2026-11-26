@@ -267,7 +267,7 @@ Butuh dulu: migration dan perubahan web di `docs/backend/live-tracking/` sudah d
 
 | # | Langkah | Hasil yang diharapkan | Android | iPhone |
 |---|---|---|---|---|
-| 7g.1 | Login akun monitor360 Enterprise → Tools | Tidak ada tile GPS (monitor memantau di web) | | |
+| 7g.1 | Login akun monitor360 Enterprise → Tools | Tidak ada tile GPS; ada tile **Monitor** (Team Monitor di aplikasi, sama seperti web) | | |
 | 7g.2 | Login pengguna360 Free → Tools → GPS | Pesan "available for Pro and Enterprise", tanpa tombol Start | | |
 | 7g.3 | Login pengguna360 Pro / Enterprise → Tools → GPS → Start sharing | Status "Sharing · sent just now", pill LIVE di peta | | |
 | 7g.4 | Buka Team Monitor di web (monitor360 Enterprise) | Anggota muncul dengan nama email sebelum @ (kapital) dan baterai asli, bergerak tiap beberapa detik | | |
@@ -276,6 +276,14 @@ Butuh dulu: migration dan perubahan web di `docs/backend/live-tracking/` sudah d
 | 7g.7 | Monitor membuka Team Monitor saat anggota diam | Posisi anggota muncul segera (jawaban heartbeat) | | |
 | 7g.8 | Stop sharing | Pill hilang; anggota menjadi offline di web setelah 60 dtk | | |
 | 7g.9 | Akun tanpa login di web/anon mencoba dengar `tracking-room` | Ditolak (kanal privat) | | |
+| 7g.10 | Monitor → Tools → Monitor → saklar ON | Status "Joining…" lalu "n members · n online"; pill MONITOR di peta; anggota yang sharing muncul sebagai marker berwarna dengan inisial dan jejak putus-putus | | |
+| 7g.11 | Ketuk marker anggota di peta (atau barisnya di sheet) | Kartu: nama, status ONLINE/IDLE/OFFLINE, koordinat DMS, elevasi (mdpl), kecepatan, baterai, waktu update; peta terbang ke anggota | | |
+| 7g.12 | Anggota berhenti sharing, tunggu 5 menit | Marker jadi abu-abu dengan titik merah (OFFLINE); diam < 1 km/h = titik kuning (IDLE) | | |
+| 7g.13 | Monitor → Tracking lists → Activities → Show on map | Jalur biru dengan titik hijau (awal) dan merah (akhir); kartu aktivitas bisa disembunyikan/ditutup; GPX bisa dibagikan | | |
+| 7g.14 | Tracking lists → Logs → filter anggota → hapus satu log | Log hilang dari daftar dan dari database (monitor saja); pengguna biasa hanya melihat lognya sendiri | | |
+| 7g.15 | Login pengguna360 → Tools | Tidak ada tile Monitor | | |
+| 7g.16 | Monitor: ketuk marker anggota yang punya akun | Kartu menampilkan nama akun (id tracker di bawahnya), paket + peran, organisasi, email, telepon + tombol WhatsApp, foto profil bila ada; marker memakai foto/inisial nama | | |
+| 7g.17 | User Account → ikon kamera di foto profil → pilih foto | Foto terpotong persegi tengah, ≤256 px; tampil di User Account, tombol akun di peta, dan di Team Monitor (web dan aplikasi); "Remove photo" menghapusnya | | |
 
 ## Fase 8 — Kepatuhan store
 
