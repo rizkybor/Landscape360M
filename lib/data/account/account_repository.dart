@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/account/account_request.dart';
 import '../../domain/account/account_rules.dart';
+import '../../domain/account/avatar.dart';
 import '../../domain/account/profile.dart';
 import '../api/api_client.dart';
 
@@ -18,6 +20,13 @@ abstract interface class AccountBackend {
   Future<void> signOut({bool others = false});
   Future<void> rpc(String fn, Map<String, dynamic> params);
   Future<List<dynamic>?> rpcRows(String fn);
+
+  /// An RPC that answers with one text (or null)
+  Future<String?> rpcText(String fn, Map<String, dynamic> params);
+
+  /// A file into the avatars bucket; [removeAvatar] takes one out
+  Future<void> uploadAvatar(String path, Uint8List jpeg);
+  Future<void> removeAvatar(String path);
   Future<Map<String, dynamic>?> profileRow(String userId);
   Future<void> updatePassword(String password);
   Future<void> updateDisplayName(String name);
@@ -45,19 +54,39 @@ class SupabaseAccountBackend implements AccountBackend {
   @override
   Future<List<dynamic>?> rpcRows(String fn) async => await client.rpc<dynamic>(fn) as List<dynamic>?;
 
+  @override
+  Future<String?> rpcText(String fn, Map<String, dynamic> params) async {
+    final v = await client.rpc<dynamic>(fn, params: params);
+    return v == null ? null : '$v';
+  }
+
+  @override
+  Future<void> uploadAvatar(String path, Uint8List jpeg) => client.storage
+      .from(avatarBucket)
+      .uploadBinary(path, jpeg, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false));
+
+  @override
+  Future<void> removeAvatar(String path) => client.storage.from(avatarBucket).remove([path]);
+
   static const _profileColumns = 'status_subscribe, status_user, is_admin, can_use_sos, organization, phone';
 
   @override
   Future<Map<String, dynamic>?> profileRow(String userId) async {
     Future<Map<String, dynamic>?> read(String columns) =>
         client.from('profiles').select(columns).eq('id', userId).maybeSingle();
-    try {
-      return await read('$_profileColumns, subscription_expires_at');
-    } on PostgrestException catch (e) {
-      // Before the 20261031000023 migration there is no subscription_expires_at
-      if (e.code == '42703' || e.code == 'PGRST204') return read(_profileColumns);
-      rethrow;
+    // Older servers lack avatar_path (20261127000035) or subscription_expires_at (20261031000023)
+    for (final columns in [
+      '$_profileColumns, subscription_expires_at, avatar_path',
+      '$_profileColumns, subscription_expires_at',
+      _profileColumns,
+    ]) {
+      try {
+        return await read(columns);
+      } on PostgrestException catch (e) {
+        if (e.code != '42703' && e.code != 'PGRST204') rethrow;
+      }
     }
+    return read(_profileColumns);
   }
 
   @override
@@ -176,6 +205,43 @@ class AccountRepository {
     await backend.updateDisplayName(name);
     await backend.rpc('update_my_contact', {'p_organization': organization.trim(), 'p_phone': phone.trim()});
   }
+
+  /// Sets my photo (a picked image, made small here) or removes it (null); returns the new
+  /// path. The old file goes once the server has taken the new one.
+  Future<String?> setAvatar(Uint8List? picked, {int? nowMs}) async {
+    final user = backend.currentUser;
+    if (user == null) throw const AccountException('Sign in first');
+    String? path;
+    if (picked != null) {
+      final jpeg = await makeAvatarInBackground(picked);
+      path = avatarPathFor(user.id, nowMs ?? DateTime.now().millisecondsSinceEpoch);
+      try {
+        await backend.uploadAvatar(path, jpeg);
+      } on Object catch (e) {
+        throw AccountException(_avatarError('The photo could not be uploaded: $e'));
+      }
+    }
+    String? old;
+    try {
+      old = await backend.rpcText('set_my_avatar', {'p_path': path});
+    } on Object catch (e) {
+      if (path != null) unawaited(backend.removeAvatar(path).then((_) {}, onError: (_) {}));
+      throw AccountException(_avatarError('$e'));
+    }
+    // The old file is no longer used; a failed delete only leaves it behind
+    if (old != null && old != path) unawaited(backend.removeAvatar(old).then((_) {}, onError: (_) {}));
+    return path;
+  }
+
+  static String _avatarError(String m) =>
+      RegExp(
+        'PGRST202|PGRST204|PGRST205|42703|42P01|could not find|does not exist|bucket not found',
+        caseSensitive: false,
+      ).hasMatch(m)
+      ? 'Profile photos are not set up yet (run the 20261127000035 migration)'
+      : m
+            .replaceFirst(RegExp(r'^(PostgrestException|StorageException|AccountException)\(message: '), '')
+            .replaceFirst(RegExp(r'[,)].*$'), '');
 
   /// Checks the signed-in account's password (by signing in with it again), before it is
   /// saved for Face ID
