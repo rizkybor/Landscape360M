@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image/image.dart' as img;
 import 'package:landscape360/data/account/account_repository.dart';
 import 'package:landscape360/data/api/api_client.dart';
 import 'package:landscape360/domain/account/account_request.dart';
@@ -63,6 +65,25 @@ class FakeBackend implements AccountBackend {
 
   @override
   Future<void> updateDisplayName(String name) async => calls.add('updateDisplayName:$name');
+
+  final uploads = <String, int>{}; // avatar path → bytes
+  final removed = <String>[];
+  String? previousAvatar;
+  Object? avatarError;
+
+  @override
+  Future<String?> rpcText(String fn, Map<String, dynamic> params) async {
+    rpcs.add((fn, params));
+    calls.add('rpc:$fn');
+    if (avatarError != null) throw avatarError!;
+    return previousAvatar;
+  }
+
+  @override
+  Future<void> uploadAvatar(String path, Uint8List jpeg) async => uploads[path] = jpeg.length;
+
+  @override
+  Future<void> removeAvatar(String path) async => removed.add(path);
 }
 
 class TokenSession implements SessionSource {
@@ -149,6 +170,41 @@ void main() {
   });
 
   group('profile', () {
+    test('sets my photo: the file goes up, the server takes it, the old one goes', () async {
+      backend
+        ..user = _user()
+        ..previousAvatar = 'u1/avatar-1.jpg';
+      final image = img.Image(width: 300, height: 300);
+      img.fill(image, color: img.ColorRgb8(40, 120, 60));
+      final path = await repo().setAvatar(img.encodePng(image), nowMs: 1700000000000);
+      expect(path, 'u1/avatar-1700000000000.jpg');
+      expect(backend.uploads.keys, ['u1/avatar-1700000000000.jpg']);
+      expect(backend.uploads.values.single, lessThanOrEqualTo(100 * 1024));
+      expect(backend.rpcs.last.$1, 'set_my_avatar');
+      expect(backend.rpcs.last.$2, {'p_path': 'u1/avatar-1700000000000.jpg'});
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.removed, ['u1/avatar-1.jpg']);
+
+      expect(await repo().setAvatar(null), isNull, reason: 'removed');
+      expect(backend.rpcs.last.$2, {'p_path': null});
+    });
+
+    test('a server refusal takes the uploaded file back and says why', () async {
+      backend
+        ..user = _user()
+        ..avatarError = const PostgrestException(
+          message: 'Could not find the function set_my_avatar',
+          code: 'PGRST202',
+        );
+      final image = img.Image(width: 50, height: 50);
+      await expectLater(
+        repo().setAvatar(img.encodePng(image)),
+        throwsA(isA<AccountException>().having((e) => e.message, 'message', contains('not set up yet'))),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.removed, hasLength(1));
+    });
+
     test('is null when signed out', () async {
       expect(await repo().loadProfile(), isNull);
     });

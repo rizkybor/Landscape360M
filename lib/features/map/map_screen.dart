@@ -44,6 +44,9 @@ import '../friends/friends_page.dart' show openFriendLink;
 import '../friends/friends_state.dart';
 import '../live/live_tracking_sheet.dart';
 import '../live/live_tracking_state.dart';
+import '../live/monitor_layer.dart';
+import '../live/monitor_sheet.dart';
+import '../live/monitor_state.dart';
 import '../marked/marked_layer.dart';
 import '../marked/marked_sheet.dart';
 import '../marked/marked_state.dart';
@@ -317,6 +320,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final classicOpen = ref.watch(classicProvider.select((s) => s.panelOpen));
     final recordingHidden = !trackOpen && ref.watch(trackRecorderProvider.select((s) => s.active != null));
     final liveOn = ref.watch(liveTrackingProvider.select((s) => s.on));
+    final monitorOn = ref.watch(monitorProvider.select((s) => s.on));
+    final monitorMember = ref.watch(monitorProvider.select((s) => s.selected != null));
+    final monitorSession = ref.watch(monitorProvider.select((s) => s.session != null));
     final sosAlerts = ref.watch(sosAlertsProvider.select((s) => s.active.isNotEmpty));
     final sharedLink = ref.watch(sharedLinkProvider) != null;
     final poiOpen = ref.watch(selectedPoiProvider) != null;
@@ -471,6 +477,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ],
                         if (recordingHidden) ...[const RecPill(), const SizedBox(height: 10)],
                         if (liveOn) ...[const LivePill(), const SizedBox(height: 10)],
+                        if (monitorSession) ...[const MonitorSessionCard(), const SizedBox(height: 10)],
+                        if (monitorMember) ...[const MonitorMemberCard(), const SizedBox(height: 10)],
+                        if (monitorOn && !monitorMember) ...[const MonitorPill(), const SizedBox(height: 10)],
                         if (routeOpen) const RoutePanel(),
                         if (navigatorOpen)
                           NavigatorPanel(onShowSurvey: (doc) => ref.read(showSurveyProvider.notifier).show(doc)),
@@ -538,6 +547,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
   BasemapLayer? _basemapLayer;
   SharedLinkLayer? _linkLayer;
   CommunityLayer? _communityLayer;
+  MonitorLayer? _monitorLayer;
   ClubMapLayer? _clubMapLayer;
   late final IncomingLinks _links = IncomingLinks(ref);
   Timer? _trackRedraw;
@@ -817,6 +827,16 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       }),
       interactionID: 'community-tap',
     );
+    // A member on Team Monitor's map: their card (again to close it)
+    map.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: monitorMarkersLayer), (feature, context) {
+        final c = context.point.coordinates;
+        if (_toolTap(c.lng.toDouble(), c.lat.toDouble())) return;
+        HapticFeedback.selectionClick();
+        ref.read(monitorProvider.notifier).select('${feature.properties['id']}');
+      }),
+      interactionID: 'monitor-tap',
+    );
     // A participant on an event's live map: their trail
     map.addInteraction(
       TapInteraction(FeaturesetDescriptor(layerId: communityLiveLayer), (feature, context) {
@@ -910,6 +930,14 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       await community.install();
       await community.show(ref.read(communityLayerProvider), ref.read(communityFocusProvider));
       await community.showLive(ref.read(communityLiveViewProvider), DateTime.now());
+      final monitor = _monitorLayer ??= MonitorLayer(
+        map,
+        scale: scale,
+        avatarUrl: ref.read(avatarUrlProvider),
+        fetch: ref.read(monitorPhotoFetchProvider),
+      );
+      await monitor.install();
+      await monitor.show(ref.read(monitorProvider), ref.read(trackClockProvider)());
       final clubMap = _clubMapLayer ??= ClubMapLayer(map);
       await clubMap.install();
       await clubMap.show(ref.read(clubMapProvider), ref.read(clubDrawProvider));
@@ -1242,6 +1270,24 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
       if (next.recording && !(prev?.recording ?? false) && !_puckOn) unawaited(_enablePuck());
     });
     ref.listen<SosAlertsState>(sosAlertsProvider, (_, next) => unawaited(_sosLayer?.show(next.active)));
+    // Team Monitor: the members move, their status is judged again every 5 s, a card opens
+    ref.listen<MonitorState>(monitorProvider, (prev, next) {
+      unawaited(_monitorLayer?.show(next, ref.read(trackClockProvider)()));
+      final t = next.selected;
+      if (t == null) {
+        if (prev?.selected != null) ref.read(monitorElevationProvider.notifier).set(null);
+        return;
+      }
+      if (t.latest.time != prev?.selected?.latest.time || t.id != prev?.selected?.id) {
+        unawaited(
+          _terrainAt(t.latest.lng, t.latest.lat).then((v) {
+            if (mounted && ref.read(monitorProvider).selectedId == t.id) {
+              ref.read(monitorElevationProvider.notifier).set(v);
+            }
+          }),
+        );
+      }
+    });
     ref.listen(poisProvider, (_, next) {
       final list = next.value;
       if (list != null) unawaited(_poiLayer?.show(list));
