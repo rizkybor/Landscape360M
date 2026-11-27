@@ -4,8 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../data/live/monitor_backend.dart';
+import '../../data/tracks/gps_source.dart';
 import '../../domain/live/monitor.dart';
-import '../tracks/track_recorder_state.dart' show onlineProvider, trackClockProvider;
+import '../tracks/track_recorder_state.dart' show gpsSourceProvider, onlineProvider, trackClockProvider;
 
 // Team Monitor in the app (the web's useTrackerStore + TrackerService's monitor side): a
 // monitor account (Enterprise monitor360, or the admin) switches it on from Tools > Monitor,
@@ -13,6 +14,11 @@ import '../tracks/track_recorder_state.dart' show onlineProvider, trackClockProv
 // position and trail. The status of each marker is judged again every 5 s. A recalled
 // activity (from the tracking lists) is drawn on the map until it is closed. It stops by
 // itself on sign out or when the account may no longer monitor.
+// In the background (Home screen, screen off) the app would be put to sleep and the room's
+// connection with it; while monitoring is on, a sparse location watch keeps it running the
+// way GPS Tracking does (Android: the foreground notification; iOS: the location mode), so
+// positions keep arriving. Back in front, the room is joined again if it dropped and everyone
+// is asked to report.
 
 final monitorChannelProvider = Provider<MonitorChannel>(
   (ref) => SupabaseMonitorChannel(ref.watch(supabaseClientProvider)),
@@ -34,6 +40,7 @@ class MonitorState {
     this.session,
     this.sessionVisible = true,
     this.profiles = const {},
+    this.keptAlive = false,
     this.tick = 0,
     this.error,
   });
@@ -49,6 +56,9 @@ class MonitorState {
 
   /// The account behind each tracker id (null: none found, not allowed, or not set up yet)
   final Map<String, TrackerProfile?> profiles;
+
+  /// Location is allowed, so the app keeps running (and listening) in the background
+  final bool keptAlive;
 
   /// Bumped every 5 s so the markers' status is judged again
   final int tick;
@@ -71,6 +81,7 @@ class MonitorState {
     List<MonitorPacket>? Function()? session,
     bool? sessionVisible,
     Map<String, TrackerProfile?>? profiles,
+    bool? keptAlive,
     int? tick,
     String? Function()? error,
   }) => MonitorState(
@@ -81,6 +92,7 @@ class MonitorState {
     session: session == null ? this.session : session(),
     sessionVisible: sessionVisible ?? this.sessionVisible,
     profiles: profiles ?? this.profiles,
+    keptAlive: keptAlive ?? this.keptAlive,
     tick: tick ?? this.tick,
     error: error == null ? this.error : error(),
   );
@@ -93,12 +105,14 @@ class MonitorController extends Notifier<MonitorState> {
   MonitorChannel? _channel; // read when monitoring starts, so Tools can watch this without a server
   String? _me;
   final _asked = <String>{}; // tracker ids whose profile was asked for (once per session)
-  List<String> _pending = const []; // my own tracker id: my own positions are not shown (the web's echo guard)
+  List<String> _pending = const [];
+  StreamSubscription<GpsFix>? _keepAlive; // my own tracker id: my own positions are not shown (the web's echo guard)
 
   @override
   MonitorState build() {
     ref.onDispose(() {
       _tick?.cancel();
+      unawaited(_keepAlive?.cancel());
       // The channel joined (if any); ref cannot be used in onDispose
       final channel = _channel;
       if (channel != null) unawaited(channel.leave());
@@ -136,13 +150,50 @@ class MonitorController extends Notifier<MonitorState> {
     } on Object catch (e) {
       if (ref.mounted) state = state.copyWith(connection: MonitorConnection.error, error: () => '$e');
     }
+    unawaited(_stayAwake());
     return true;
+  }
+
+  /// Keeps the app running in the background while monitoring: the sparse location watch
+  /// (nothing is done with the fixes). Without location permission monitoring still works
+  /// in front.
+  Future<void> _stayAwake() async {
+    if (_keepAlive != null) return;
+    try {
+      final gps = ref.read(gpsSourceProvider);
+      var access = await gps.access();
+      if (access == GpsAccess.denied) access = await gps.request();
+      if (!ref.mounted || !state.on || access != GpsAccess.allowed) return;
+      _keepAlive = gps.watchSparse().listen((_) {}, onError: (_) {});
+      state = state.copyWith(keptAlive: true);
+    } on Object {
+      // No GPS: in front only
+    }
+  }
+
+  /// Back in front: the room again when its connection dropped while away, and everyone
+  /// asked to report now
+  Future<void> resumed() async {
+    if (!state.on) return;
+    if (state.connection == MonitorConnection.connected) return askNow();
+    final channel = _channel;
+    if (channel == null) return;
+    state = state.copyWith(connection: MonitorConnection.connecting, error: () => null);
+    try {
+      await channel.leave();
+      await channel.join(onPacket: _heard, onStatus: _status);
+    } on Object catch (e) {
+      if (ref.mounted) state = state.copyWith(connection: MonitorConnection.error, error: () => '$e');
+    }
   }
 
   Future<void> stop() async {
     _tick?.cancel();
     _tick = null;
     await _channel?.leave();
+    // Not awaited: letting go of the location watch may take a moment on the platform side
+    unawaited(_keepAlive?.cancel());
+    _keepAlive = null;
     _asked.clear();
     _pending = const [];
     if (ref.mounted) {
@@ -172,6 +223,13 @@ class MonitorController extends Notifier<MonitorState> {
   void heard(MonitorPacket p) {
     final now = _now;
     final current = state.trackers[p.trackerId];
+    // The same fix again (a member answering a heartbeat while standing still): nothing new
+    if (current != null &&
+        current.latest.time == p.time &&
+        current.latest.lat == p.lat &&
+        current.latest.lng == p.lng) {
+      return;
+    }
     final next = current == null
         ? MonitorTracker(latest: p, trail: [(p.lng, p.lat)], heardAt: now)
         : current.update(p, now);

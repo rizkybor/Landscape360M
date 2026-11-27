@@ -67,6 +67,15 @@ class MonitorLayer {
   final _loading = <String>{};
   MonitorState? _last;
   int _lastNow = 0;
+  Timer? _redraw;
+  int _drawnAt = 0;
+
+  /// Positions arrive every 3 s from every member: the sources are rewritten at most this
+  /// often (the newest state is what gets drawn), so the map is not re-encoded per packet
+  static const redrawEvery = Duration(milliseconds: 400);
+
+  /// For tests: the clock the throttle uses
+  int Function() clock = () => DateTime.now().millisecondsSinceEpoch;
 
   Future<void> install() async {
     _installed = false;
@@ -282,7 +291,34 @@ class MonitorLayer {
     _installed = true;
   }
 
-  Future<void> show(MonitorState s, int nowMs) => onStyle(() => _show(s, nowMs));
+  /// Draws the state, at once when the last drawing is older than [redrawEvery], else soon
+  /// after it (coalescing everything heard meanwhile)
+  Future<void> show(MonitorState s, int nowMs) {
+    _last = s;
+    _lastNow = nowMs;
+    final since = clock() - _drawnAt;
+    if (since >= redrawEvery.inMilliseconds && _redraw == null) return _draw();
+    _redraw ??= Timer(redrawEvery - Duration(milliseconds: since.clamp(0, redrawEvery.inMilliseconds)), () {
+      _redraw = null;
+      unawaited(_draw());
+    });
+    return Future.value();
+  }
+
+  /// How many times the sources were rewritten (tests)
+  int draws = 0;
+
+  Future<void> _draw() {
+    _drawnAt = clock();
+    draws++;
+    final s = _last;
+    return s == null ? Future.value() : onStyle(() => _show(s, _lastNow));
+  }
+
+  void dispose() {
+    _redraw?.cancel();
+    _redraw = null;
+  }
 
   Future<void> _show(MonitorState s, int nowMs) async {
     if (!_installed) return;
