@@ -32,8 +32,10 @@ class MonitorPacket {
     required this.time,
   });
 
-  /// From the broadcast payload; null when it is not a position
-  static MonitorPacket? fromJson(Map<String, dynamic> j) {
+  /// From the broadcast payload (or the whole message around it); null when it is not a position
+  static MonitorPacket? fromJson(Map<String, dynamic> json) {
+    final inner = json['payload'];
+    final j = json['user_id'] == null && inner is Map ? Map<String, dynamic>.from(inner) : json;
     final id = j['user_id'];
     final lat = j['lat'], lng = j['lng'];
     if (id is! String || id.isEmpty || lat is! num || lng is! num) return null;

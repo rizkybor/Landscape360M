@@ -57,7 +57,15 @@ class SupabaseMonitorChannel implements MonitorChannel {
     final session = client.auth.currentSession;
     if (session != null) await client.realtime.setAuth(session.accessToken);
     final room = _room = client.channel('tracking-room', opts: _private)
-      ..onBroadcast(event: 'location-update', callback: (payload) => onPacket(Map<String, dynamic>.from(payload)));
+      ..onBroadcast(
+        event: 'location-update',
+        // The Dart client hands over the whole message ({type, event, payload}), unlike the
+        // JavaScript one: the position is inside 'payload'
+        callback: (message) {
+          final inner = message['payload'];
+          onPacket(Map<String, dynamic>.from(inner is Map ? inner : message));
+        },
+      );
     room.subscribe((status, error) {
       switch (status) {
         case RealtimeSubscribeStatus.subscribed:
