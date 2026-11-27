@@ -188,6 +188,13 @@ void main() {
       expect((p.trackerId, p.lat, p.lng, p.alt, p.speed, p.battery), ('RINA.HIKER', -6.78, 106.98, 1820.0, 1.2, 64));
       expect(p.time, DateTime.utc(2025, 10, 29, 1, 6, 40, 123).millisecondsSinceEpoch);
       expect(MonitorPacket.fromJson({'user_id': 'X'}), isNull);
+      // As the Dart Realtime client hands it over: the message around the payload
+      final wrapped = MonitorPacket.fromJson({
+        'type': 'broadcast',
+        'event': 'location-update',
+        'payload': packet('BUDI'),
+      });
+      expect((wrapped?.trackerId, wrapped?.lat), ('BUDI', -6.78));
       expect(MonitorPacket.fromJson({'user_id': 'X', 'lat': 91, 'lng': 0}), isNull);
     });
 
