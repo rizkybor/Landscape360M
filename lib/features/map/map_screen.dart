@@ -116,6 +116,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onResume() {
     // New messages and friend requests: the badge
     unawaited(ref.read(friendsUnreadProvider.notifier).refresh());
+    // Team Monitor: the room again if it dropped while away, and fresh positions
+    unawaited(ref.read(monitorProvider.notifier).resumed());
     final now = DateTime.now();
     if (now.difference(_profileReadAt) < const Duration(minutes: 2)) return;
     _profileReadAt = now;
@@ -606,6 +608,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> {
     _chromeTimer?.cancel();
     _hintTimer?.cancel();
     _layers?.dispose();
+    _monitorLayer?.dispose();
     _settle?.cancel();
     _trackRedraw?.cancel();
     _cameraTick.dispose();

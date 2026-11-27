@@ -284,6 +284,9 @@ Butuh dulu: migration dan perubahan web di `docs/backend/live-tracking/` sudah d
 | 7g.15 | Login pengguna360 → Tools | Tidak ada tile Monitor | | |
 | 7g.16 | Monitor: ketuk marker anggota yang punya akun | Kartu menampilkan nama akun (id tracker di bawahnya), paket + peran, organisasi, email, telepon + tombol WhatsApp, foto profil bila ada; marker memakai foto/inisial nama | | |
 | 7g.17 | User Account → ikon kamera di foto profil → pilih foto | Foto terpotong persegi tengah, ≤256 px; tampil di User Account, tombol akun di peta, dan di Team Monitor (web dan aplikasi); "Remove photo" menghapusnya | | |
+| 7g.18 | Monitor ON → tekan Home 3 menit (anggota terus sharing) → kembali | Android: notifikasi "Landscape 360 is using GPS" selama Monitor ON; iOS: indikator lokasi. Saat kembali, jejak anggota lengkap (tidak ada celah 3 menit) dan status "n online" | | |
+| 7g.19 | Monitor ON, matikan Wi‑Fi/data 1 menit, nyalakan, buka aplikasi | Pill "joining…" lalu "n members"; posisi langsung segar (heartbeat saat kembali) | | |
+| 7g.20 | Monitor ON dengan 20+ anggota | Peta tetap halus; marker diperbarui maksimal ±2× per detik, bukan per paket | | |
 
 ## Fase 8 — Kepatuhan store
 

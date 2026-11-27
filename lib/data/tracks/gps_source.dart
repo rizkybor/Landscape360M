@@ -124,7 +124,7 @@ class GeolocatorGpsSource implements GpsSource {
         intervalDuration: const Duration(seconds: 30),
         foregroundNotificationConfig: const geo.ForegroundNotificationConfig(
           notificationTitle: 'Landscape 360 is using GPS',
-          notificationText: 'Sharing your position with your club for an event. Open the app to stop.',
+          notificationText: 'Sharing your position for an event, or following your team in Team Monitor. Open the app to stop.',
           notificationChannelName: 'GPS in the background',
           enableWakeLock: true,
           setOngoing: true,
