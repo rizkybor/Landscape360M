@@ -7,15 +7,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:landscape360/core/providers.dart';
 import 'package:landscape360/core/theme/app_theme.dart';
 import 'package:landscape360/data/live/monitor_backend.dart';
+import 'package:landscape360/data/tracks/gps_source.dart';
 import 'package:landscape360/domain/account/profile.dart';
 import 'package:landscape360/domain/live/monitor.dart';
 import 'package:landscape360/features/live/monitor_sheet.dart';
 import 'package:landscape360/features/live/monitor_state.dart';
 import 'package:landscape360/features/map/map_sheet.dart';
 import 'package:landscape360/features/map/map_tools_state.dart';
-import 'package:landscape360/features/tracks/track_recorder_state.dart' show onlineProvider, trackClockProvider;
+import 'package:landscape360/features/tracks/track_recorder_state.dart'
+    show gpsSourceProvider, onlineProvider, trackClockProvider;
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+
+import 'track_recorder_state_test.dart' show FakeGps;
 
 // Team Monitor: the member model as the web judges it (colour, initials, status, DMS), the
 // GeoJSON on the map, joining the room and keeping each member's last position and trail, the
@@ -136,12 +140,14 @@ Map<String, dynamic> packet(
 void main() {
   late FakeMonitorChannel channel;
   late FakeMonitorRepository repo;
+  late FakeGps gps;
   late int now;
 
   setUp(() {
     SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
     channel = FakeMonitorChannel();
     repo = FakeMonitorRepository();
+    gps = FakeGps();
     // 2025-10-29T01:06:50Z: ten seconds after the packets' time
     now = DateTime.utc(2025, 10, 29, 1, 6, 50).millisecondsSinceEpoch;
   });
@@ -151,6 +157,7 @@ void main() {
   List<Override> overrides({Stream<String?>? auth}) => [
     monitorChannelProvider.overrideWithValue(channel),
     monitorRepositoryProvider.overrideWithValue(repo),
+    gpsSourceProvider.overrideWithValue(gps),
     onlineProvider.overrideWith((ref) => Stream.value(true)),
     trackClockProvider.overrideWithValue(() => now),
     profileProvider.overrideWith((ref) async => ref.watch(_account)),
@@ -364,6 +371,18 @@ void main() {
       );
     });
 
+    test('the same fix heard again changes nothing (no redraw for heartbeat echoes)', () async {
+      final c = await container();
+      await c.read(monitorProvider.notifier).start();
+      channel.hear(packet('RINA.HIKER'));
+      final before = c.read(monitorProvider);
+      channel.hear(packet('RINA.HIKER'));
+      expect(identical(c.read(monitorProvider), before), isTrue);
+      expect(c.read(monitorProvider).trackers['RINA.HIKER']!.trail, hasLength(1));
+      channel.hear(packet('RINA.HIKER', at: '2025-10-29T01:06:43.000Z'));
+      expect(c.read(monitorProvider).trackers['RINA.HIKER']!.trail, hasLength(2));
+    });
+
     test('stopping leaves the room and forgets the members; sign out stops it', () async {
       final c = await container();
       await c.read(monitorProvider.notifier).start();
@@ -378,6 +397,32 @@ void main() {
       await wait();
       expect(c.read(monitorProvider).on, isFalse, reason: 'the account may no longer monitor');
     });
+
+    test(
+      'keeps the app awake in the background with a sparse location watch; back in front it asks again or rejoins',
+      () async {
+        final c = await container();
+        await c.read(monitorProvider.notifier).start();
+        await wait();
+        expect(gps.watches, 1, reason: 'the location watch keeps the app running');
+        expect(c.read(monitorProvider).keptAlive, isTrue);
+        await c.read(monitorProvider.notifier).resumed();
+        expect(channel.asks, 2, reason: 'connected: only asks again');
+        channel.onStatus!(MonitorConnection.off);
+        await c.read(monitorProvider.notifier).resumed();
+        expect((channel.leaves, channel.joins), (1, 2), reason: 'dropped: joined again');
+        expect(c.read(monitorProvider).connection, MonitorConnection.connected);
+        await c.read(monitorProvider.notifier).stop();
+        await wait();
+        expect(gps.controller?.hasListener ?? false, isFalse);
+
+        gps.accessResult = GpsAccess.deniedForever;
+        await c.read(monitorProvider.notifier).start();
+        await wait();
+        expect(c.read(monitorProvider).keptAlive, isFalse, reason: 'no location: in front only');
+        expect(c.read(monitorProvider).connection, MonitorConnection.connected);
+      },
+    );
 
     test('the room refusing shows an error, still on', () async {
       channel.failJoin = true;
@@ -461,6 +506,8 @@ void main() {
       await settle(tester);
       expect(find.byKey(const Key('member-RINA.HIKER')), findsOneWidget);
       expect(find.textContaining('2 members · 2 online'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('member-RINA.HIKER')));
+      await settle(tester);
       await tester.tap(find.byKey(const Key('member-RINA.HIKER')));
       await settle(tester);
       expect(c.read(monitorProvider).selectedId, 'RINA.HIKER');

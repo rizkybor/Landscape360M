@@ -252,6 +252,23 @@ class _MonitorSheetState extends ConsumerState<_MonitorSheet> {
                   ),
               ],
             ),
+          if (s.on && !s.keptAlive)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Allow location so Team Monitor keeps listening when the app is in the background.',
+                key: Key('monitor-background-note'),
+                style: TextStyle(fontSize: 12, color: L360Colors.gold700),
+              ),
+            ),
+          if (s.on && s.keptAlive)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Keeps listening in the background, like GPS Tracking.',
+                style: TextStyle(fontSize: 12, color: L360Colors.sand600),
+              ),
+            ),
           if (allowed) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(
